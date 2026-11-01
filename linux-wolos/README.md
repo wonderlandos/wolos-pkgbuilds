@@ -4,7 +4,7 @@
 `VERSION` is the single source (`wolkernel=`, `linux=`): the linux-wolos PKGBUILD reads it (pkgver `1.0+7.3`, epoch 1), `tools/lint.sh` holds linux-wolos-api-headers to it, and `uname -v` shows it.
 
 WolKernel (package `linux-wolos`, ADR 0016/0017/0029) = the tag `wolkernel-<wolkernel>-<linux>` of github.com/wonderlandos/linux (upstream stable + one commit per WolKernel patch on branch `wolos-7.3`, see `README.wolos.md` there), over Arch's x86_64 config. Patches live only on the fork.
-Config: Arch's `config.x86_64` + the fork's `kernel/configs/wolos.config` at the tag (`prepare.sh`), the only WolOS fragment; `make olddefconfig` runs once, in the PKGBUILD. Source: GitHub's tag tarball, its sha256 pinned (`tools/bump-kernel.sh TAG`).
+Config: Arch's `config.x86_64` + the fork's `kernel/configs/wolos.config` at the tag (`prepare.sh`), the only WolOS fragment; `make olddefconfig` runs twice (prepare.sh, then the PKGBUILD), as for the published kernels. Source: GitHub's tag tarball, its sha256 pinned (`tools/bump-kernel.sh TAG`).
 
 | path | what |
 |---|---|

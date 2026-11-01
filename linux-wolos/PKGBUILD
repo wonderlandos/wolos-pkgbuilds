@@ -93,6 +93,8 @@ prepare() {
     if [ -f "$_modprobed_db" ]; then _make LSMOD="$_modprobed_db" localmodconfig </dev/null
     else _make localmodconfig </dev/null; fi
   fi
+  # Second olddefconfig pass (prepare.sh ran the first): two passes, as the published kernels;
+  # one pass would keep DRM_COREBOOTDRM=m (transitional GOOGLE_FRAMEBUFFER_COREBOOT).
   _make olddefconfig
   _make -s kernelrelease > version
   echo "Prepared $pkgbase version $(<version)"
