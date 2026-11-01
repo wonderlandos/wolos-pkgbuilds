@@ -11,11 +11,16 @@ for p in "$@"; do
   bsdtar -xpf "$p" -C "$T" --no-xattrs --exclude '.PKGINFO' --exclude '.MTREE' --exclude '.BUILDINFO' --exclude '.INSTALL' 2>/dev/null ||
     { echo "base-manifest.sh: cannot read $p" >&2; exit 1; }
 done
+# Owner read on everything: some files are not readable even by their owner (dbus-daemon-launch-helper
+# is 4110), and the build host extracts as a plain user; their sha256 came out empty.
+chmod -R u+rX "$T"
 cd "$T"
 find . \( -type f -o -type l \) -printf '%P\n' | LC_ALL=C sort | while IFS= read -r f; do
   if [ -L "$f" ]; then
     printf '%s  /%s\n' "$(readlink "$f" | sha256sum | cut -d' ' -f1)" "$f"
   else
-    printf '%s  /%s\n' "$(sha256sum < "$f" | cut -d' ' -f1)" "$f"
+    h=$(sha256sum < "$f" | cut -d' ' -f1)
+    [ -n "$h" ] || { echo "base-manifest.sh: cannot hash /$f" >&2; exit 1; }
+    printf '%s  /%s\n' "$h" "$f"
   fi
 done

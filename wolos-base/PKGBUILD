@@ -11,7 +11,7 @@
 # with, and wolos-system's /etc/sudoers clashes with the chroot's sudo.
 pkgname=wolos-base
 pkgver=0.11.4  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=4
+pkgrel=5
 pkgdesc='WolOS base system: kernel, headers and userland of one release'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
