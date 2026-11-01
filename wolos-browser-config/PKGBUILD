@@ -2,13 +2,13 @@
 # wolos-browser-config: browser defaults and theme loader. Not in the image and not in packages.
 pkgname=wolos-browser-config
 pkgver=1
-pkgrel=4
+pkgrel=5
 pkgdesc='WolOS browser defaults'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 # The files live with the code that generates and tests them: wolos desktop/browser-config.
-_wolos_commit=bf8bfc691289c6e81cae843f01d725ea257869a2
+_wolos_commit=1dcdea6e08525ce031d3b0587bdf850e2a0916c0
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 makedepends=(git)
