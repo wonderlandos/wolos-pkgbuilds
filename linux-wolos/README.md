@@ -1,14 +1,13 @@
 # linux-wolos (WolKernel)
 
-**WolKernel 1.1 (7.3)**: WolKernel release 1.1 on Linux 7.3. The product version comes first, the Linux base is always shown in parentheses.
-`VERSION` is the single source (`wolkernel=`, `linux=`): the linux-wolos PKGBUILD reads it (pkgver `1.1+7.3`, epoch 1), `tools/lint.sh` holds linux-wolos-api-headers to it, and `uname -v` shows it.
+**WolKernel 1.0 (7.3)**: WolKernel release 1.0 on Linux 7.3. The product version comes first, the Linux base is always shown in parentheses.
+`VERSION` is the single source (`wolkernel=`, `linux=`): the linux-wolos PKGBUILD reads it (pkgver `1.0+7.3`, epoch 1), `tools/lint.sh` holds linux-wolos-api-headers to it, and `uname -v` shows it.
 
 WolKernel (package `linux-wolos`, ADR 0016/0017/0029) = the tag `wolkernel-<wolkernel>-<linux>` of github.com/wonderlandos/linux (upstream stable + one commit per WolKernel patch on branch `wolos-7.3`, see `README.wolos.md` there), over Arch's x86_64 config. Patches live only on the fork.
-Config: the fork's `kernel/configs/wolos.config`, then `wolos.config` here merged on top (`prepare.sh`).
+Config: Arch's `config.x86_64` + the fork's `kernel/configs/wolos.config` at the tag (`prepare.sh`), the only WolOS fragment; `make olddefconfig` runs once, in the PKGBUILD. Source: GitHub's tag tarball, its sha256 pinned (`tools/bump-kernel.sh TAG`).
 
 | path | what |
 |---|---|
-| `wolos.config` | Kconfig fragment, one comment per group; `scripts/kconfig/merge_config.sh <arch config> wolos.config && make olddefconfig` |
 | `VERSION` | WolKernel and Linux base versions (bump `wolkernel=` per release, `linux=` when the fork moves to a new line; the tag follows) |
 | `abi-removed.txt` | userspace interfaces removed versus Arch's kernel, one per line (`wol doctor` reads it) |
 | `../linux-wolos-api-headers/` | UAPI headers from the same tag; replaces `linux-api-headers` |
@@ -36,7 +35,7 @@ What is in 1.0 (each has an off switch; table with sources in `README.wolos.md` 
 | build | `-O3`, x86-64-v3/v4 flavours, Clang ThinLTO, zstd modules, ccache (options below) |
 
 Measured (7.3.0, `make olddefconfig`, before the 1.0 trim): Arch 6332 modules / 3247 built-in options; WolKernel 6154 / 3164 (-178 modules, -83 built-in).
-WolKernel 1.1 (7.3): not re-measured.
+WolKernel 1.0 (7.3): not re-measured.
 
 
 ## Build

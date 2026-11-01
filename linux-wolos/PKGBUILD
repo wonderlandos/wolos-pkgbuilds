@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # linux-wolos: WolKernel, the WolOS kernel fork (github.com/wonderlandos/linux): every WolOS patch is a
 # commit on the fork's wolos-<linux> branch, released as the tag wolkernel-<wolkernel>-<linux> (VERSION).
-# Config: Arch's config.x86_64 from the snapshot (vendored next to this file), then the fork's
-# kernel/configs/wolos.config, then ./wolos.config merged last (prepare.sh). Packaging follows Arch's linux.
+# Config: Arch's config.x86_64 from the snapshot (vendored next to this file) + the fork's
+# kernel/configs/wolos.config at the tag (prepare.sh), the only WolOS fragment. Packaging follows Arch's linux.
 # Build: wolos-build pkg linux-wolos (clean chroot; github.com/wonderlandos/wolos-build).
 # No patches are applied here and there is no private patch hook: the old kernel/linux/patches series and
 # the private overlay patch hook were folded into the fork (ADR "repository split").
@@ -34,12 +34,12 @@ _wk=$(sed -n 's/^wolkernel=//p' "$startdir/VERSION")
 _linux=$(sed -n 's/^linux=//p' "$startdir/VERSION")
 epoch=1
 pkgver=$_wk+$_linux
-pkgrel=1
+pkgrel=5
 pkgdesc="WolKernel $_wk ($_linux)"
 url='https://github.com/wonderlandos/linux'
 arch=(x86_64)
 license=(GPL-2.0-only)
-makedepends=(bc binutils cpio gettext git glibc libelf libgcc openssl pahole perl python rust
+makedepends=(bc binutils cpio gettext glibc libelf libgcc openssl pahole perl python rust
   rust-bindgen rust-src tar xxhash xz zlib zstd)
 options=(!debug !strip)
 [ "$_use_llvm_lto" = none ] || makedepends+=(clang llvm lld)
@@ -60,17 +60,17 @@ _make() {
       ${_propeller_prefix:+CLANG_PROPELLER_PROFILE_PREFIX="$_propeller_prefix"} "$@"
   fi
 }
-# The fork at its release tag. TODO(main): the kernel worker creates wolkernel-1.1-7.3 on the fork's
-# wolos-7.3 branch; until it exists this recipe does not build.
+# The fork at its release tag, as GitHub's tag tarball (a few hundred MB instead of a full clone).
+# tools/bump-kernel.sh TAG moves VERSION and the checksum (also in linux-wolos-api-headers).
 _tag=wolkernel-$_wk-$_linux
-_srcname=linux
+_srcname=linux-$_tag
 source=(
-  "linux::git+https://github.com/wonderlandos/linux.git#tag=$_tag"
+  "linux-$_tag.tar.gz::https://github.com/wonderlandos/linux/archive/refs/tags/$_tag.tar.gz"
   config.x86_64
-  wolos.config
   prepare.sh
 )
-sha256sums=(SKIP SKIP SKIP SKIP)
+sha256sums=('5c0880774f3c928a4d9e344a8cb309069f5d049d7a60333f99a2f54450a023fd'
+  SKIP SKIP)
 
 export KBUILD_BUILD_HOST=wolos
 export KBUILD_BUILD_USER=$pkgbase
@@ -81,7 +81,7 @@ export KBUILD_BUILD_TIMESTAMP="$(date -Ru${SOURCE_DATE_EPOCH:+d @$SOURCE_DATE_EP
 prepare() {
   cd $_srcname
   echo "-$pkgrel" > localversion.10-pkgrel
-  sh ../prepare.sh . ../config.x86_64 ../wolos.config
+  sh ../prepare.sh . ../config.x86_64
   [ "$_march" = native ] && scripts/config -e X86_NATIVE_CPU
   case $_use_llvm_lto in
     thin) scripts/config -d LTO_NONE -e LTO_CLANG_THIN ;;

@@ -5,7 +5,7 @@ Shape (like Android's common kernel): stable core + small WolOS series + fixed u
 | layer | where |
 |---|---|
 | stable core | github.com/wonderlandos/linux at the ref pinned by `linux-wolos/PKGBUILD` (public) |
-| config | `linux-wolos/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
+| config | the fork's `kernel/configs/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
 | perf series | `linux/patches/*.patch`, applied in name order by the PKGBUILD |
 | scheduler | `scx_wolos/` (sched_ext BPF + loader + unit); interface: `scx_wolos/INTERFACE.md` |
 | KMI | `kmi/` symbol freeze per release line |

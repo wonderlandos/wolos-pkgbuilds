@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-//! linux-wolos (ADR 0016): the WolOS kernel fork at a pinned commit + Arch's config at the snapshot +
-//! `linux-wolos/wolos.config` + extra patches from `$WOLOS_TREE/kernel/linux/patches` when present.
-//! The kernel builds with makepkg; these tests pin what the recipe and its prepare step must do.
+//! linux-wolos (ADR 0016): the WolOS kernel fork at its release tag + Arch's config at the snapshot +
+//! the fork's `kernel/configs/wolos.config` (the only WolOS fragment; patches are commits on the fork).
+//! The config tests read that fragment from the fork at the tag: $WOLOS_LINUX, else ../linux next to
+//! this repo (ci.yml unpacks the recipe's pinned tarball there). The others pin what the recipe does.
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]
 mod siblings;
@@ -16,11 +17,21 @@ fn read(p: &str) -> String {
     fs::read_to_string(repo(p)).unwrap_or_else(|e| panic!("{p}: {e}"))
 }
 
+/// The fork's kernel/configs/wolos.config at the tag the recipe pins.
+fn fragment() -> String {
+    let src = std::env::var_os("WOLOS_LINUX")
+        .map_or_else(|| PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../linux")), PathBuf::from);
+    let p = src.join("kernel/configs/wolos.config");
+    fs::read_to_string(&p).unwrap_or_else(|e| {
+        panic!("{}: {e} (set WOLOS_LINUX to the fork at the linux-wolos tag)", p.display())
+    })
+}
+
 /// Sealed slots need fs-verity (btrfs supports it when the kernel does) and an overlay for /etc;
 /// encrypted disks need dm-crypt and the TPM drivers.
 #[test]
 fn fragment_has_verity_overlay_and_disk_encryption() {
-    let c = read("linux-wolos/wolos.config");
+    let c = fragment();
     for on in [
         "CONFIG_FS_VERITY=y",
         "CONFIG_OVERLAY_FS=y",
@@ -36,7 +47,7 @@ fn fragment_has_verity_overlay_and_disk_encryption() {
 
 #[test]
 fn fragment_sets_the_desktop_options_each_with_a_reason() {
-    let c = read("linux-wolos/wolos.config");
+    let c = fragment();
     for want in [
         "CONFIG_PREEMPT=y",
         "CONFIG_HZ_1000=y",
@@ -94,7 +105,7 @@ fn version_has_one_source_and_shows_the_linux_base_in_parentheses() {
     assert_eq!((wk.as_str(), linux.as_str()), ("1.0", "7.3"));
     let shown = format!("WolKernel {wk} ({linux})");
     assert!(
-        read("kernel/README.md").contains(&shown),
+        read("linux-wolos/README.md").contains(&shown),
         "README lacks {shown}"
     );
     for pkg in [
@@ -135,7 +146,7 @@ fn option_set(c: &str, opt: &str) -> bool {
 /// (Steam/Proton, Flatpak, Docker, KVM, DKMS, laptops).
 #[test]
 fn fragment_tunes_for_desktops_and_keeps_compatibility() {
-    let c = read("linux-wolos/wolos.config");
+    let c = fragment();
     for want in [
         "CONFIG_NTSYNC=m",
         "CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y",
@@ -208,7 +219,7 @@ fn fragment_tunes_for_desktops_and_keeps_compatibility() {
 /// Lean core and Apple hardware: options the fragment turns off or on.
 #[test]
 fn fragment_trims_unused_code_and_supports_apple_devices() {
-    let c = read("linux-wolos/wolos.config");
+    let c = fragment();
     for off in [
         "ACPI_DEBUG",
         "SECURITY_SMACK",
@@ -265,7 +276,7 @@ fn recipe_has_build_flavours_and_fast_developer_builds() {
 /// Scheduler patches on, four 8250 ports probed at boot instead of 32.
 #[test]
 fn config_turns_on_the_scheduler_patches() {
-    let c = read("linux-wolos/wolos.config");
+    let c = fragment();
     for on in [
         "CONFIG_SCHED_PROXY_EXEC=y",
         "CONFIG_WOLOS_SHIELD=y",

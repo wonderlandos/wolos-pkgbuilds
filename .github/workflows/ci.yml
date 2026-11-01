@@ -31,5 +31,15 @@ jobs:
       - name: shellcheck
         working-directory: wolos-pkgbuilds
         run: shellcheck -S error tools/*.sh wolos-base/*.sh linux-wolos/prepare.sh linux-wolos/kmi/kmi.sh
+      - name: The fork's config fragment at the pinned tag (tarball checksum = the recipe's)
+        # The kernel config tests read kernel/configs/wolos.config of the tag linux-wolos builds
+        # (checks/tests/kernel_linux.rs), so a moved tag or a fragment that drops an option fails here.
+        working-directory: wolos-pkgbuilds/linux-wolos
+        run: |
+          read -r tag sum < <(bash -c 'startdir=$PWD; source ./PKGBUILD >/dev/null; echo "$_tag ${sha256sums[0]}"')
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/linux.tar.gz" "https://github.com/wonderlandos/linux/archive/refs/tags/$tag.tar.gz"
+          echo "$sum  $RUNNER_TEMP/linux.tar.gz" | sha256sum -c -
+          mkdir -p "$GITHUB_WORKSPACE/linux"
+          tar -xzf "$RUNNER_TEMP/linux.tar.gz" -C "$GITHUB_WORKSPACE/linux" --strip-components=1 "linux-$tag/kernel/configs/wolos.config"
       - name: Contract tests
         run: cargo test --manifest-path wolos-pkgbuilds/checks/Cargo.toml

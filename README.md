@@ -6,7 +6,7 @@ packaging repos. How packages are built and released: [BUILD.md](BUILD.md).
 | Path | What |
 |---|---|
 | `packages` | build order: name, directory, local deps, watched paths |
-| `linux-wolos/` | WolKernel: the fork `wonderlandos/linux` at tag `wolkernel-<VERSION>`, `config.x86_64` + `wolos.config`, `VERSION`, `kmi/` ([README](linux-wolos/README.md)) |
+| `linux-wolos/` | WolKernel: the fork `wonderlandos/linux` at tag `wolkernel-<VERSION>`, `config.x86_64` (the WolOS fragment is the fork's `kernel/configs/wolos.config`), `VERSION`, `kmi/` ([README](linux-wolos/README.md)) |
 | `linux-wolos-api-headers/` | UAPI headers from the same tag |
 | `hyprland-wolos/` | Hyprland 0.56.2 + `patches/` |
 | `wolos-system/`, `wopkg/`, `wolos-base/`, `wolos-browser-config/` | built from `github.com/wonderlandos/wolos` at `_wolos_commit` (bumped by `tools/bump-wolos.sh`) |
