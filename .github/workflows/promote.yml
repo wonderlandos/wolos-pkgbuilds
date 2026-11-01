@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# testing -> stable, by hand after a release passed its VM test (wolos-iso release.yml): every
+# package [wolos-testing] serves goes into [wolos] (release wolos-<snapshot>, the server in
+# wolos-mirrorlist), re-indexed and signed (wolos-build publish stable), and to the CDN.
+# Secrets: WOLOS_GPG_KEY, WOLOS_RELEASES_TOKEN, WOLOS_CDN_TOKEN, WOLOS_BUILD_TOKEN.
+name: promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "promote" to copy [wolos-testing] into [wolos]
+        required: true
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    if: inputs.confirm == 'promote'
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ vars.WOLOS_RELEASES_REPO || 'wonderlandos/wolos-packages' }}
+      GH_TOKEN: ${{ secrets.WOLOS_RELEASES_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: wolos-pkgbuilds
+      - uses: actions/checkout@v4
+        with:
+          repository: wonderlandos/wolos-build
+          token: ${{ secrets.WOLOS_BUILD_TOKEN }}
+          path: wolos-build
+      - name: The packages of [wolos-testing]
+        run: |
+          mkdir -p out/testing
+          gh release download wolos-testing --dir out/testing --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig'
+          ls out/testing | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Sign, index, upload to [wolos], CDN
+        env:
+          GPG_KEY: ${{ secrets.WOLOS_GPG_KEY }}
+          WOLOS_CDN_TOKEN: ${{ secrets.WOLOS_CDN_TOKEN }}
+          WOLOS_CDN_URL: ${{ vars.WOLOS_CDN_URL }}
+        run: |
+          [ -n "$GH_TOKEN" ] && [ -n "$GPG_KEY" ] || { echo "::error::WOLOS_RELEASES_TOKEN and WOLOS_GPG_KEY are required"; exit 1; }
+          docker run --rm -v "$PWD:/src" -w /src -v "$(command -v gh):/usr/local/bin/gh:ro" \
+            -e GPG_KEY -e GH_REPO -e GH_TOKEN -e WOLOS_CDN_TOKEN -e WOLOS_CDN_URL archlinux:base-devel bash -euo pipefail -c '
+              pacman -Sy --noconfirm --needed git gnupg python libarchive >/dev/null
+              git config --global --add safe.directory "*"
+              echo "$GPG_KEY" | gpg --batch --import
+              export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")
+              WOLOS_PKGBUILDS=/src/wolos-pkgbuilds WOLOS_WORK=/src/out/work wolos-build/wolos-build publish stable out/testing
+            '

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# hyprland-wolos: Hyprland 0.56.2 (the snapshot's version) + the WolOS patches in image/hyprland/patches,
-# applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: archicture/modules/hyprland-fork.md
+# hyprland-wolos: Hyprland 0.56.2 (the snapshot's version) + the WolOS patches in patches/,
+# applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
 pkgrel=2
@@ -17,16 +17,42 @@ makedepends=(cmake glaze hyprland-protocols hyprwayland-scanner meson ninja xorg
 provides=(hyprland="$pkgver" wayland-compositor)
 conflicts=(hyprland)
 _archive="Hyprland-$pkgver"
-source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.gz")
-sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e')
+# The WolOS patches (patches/, applied in name order) are local sources like any Arch patch.
+source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.gz"
+  patches/0001-animation-tick-once-per-monitor-frame-instead-of-eve.patch
+  patches/0002-renderer-arm-cursor-hide-ticker-for-the-timeout-5-s-.patch
+  patches/0003-config-no-.conf-deprecation-banner-WolOS-pins-0.56-w.patch
+  patches/0004-xdg-shell-advertise-minimise-client-minimise-moves-t.patch
+  patches/0005-session-lock-a-takeover-lock-hides-workspaces-from-i.patch
+  patches/0006-sendshortcut-keys-resolve-without-held-modifiers-the.patch
+  patches/0007-layer-shell-content-commits-damage-only-what-changed.patch
+  patches/0008-focus-restores-a-minimised-window-to-the-current-des.patch
+  patches/0009-direct-scanout-auto-mode-also-covers-fullscreen-vide.patch
+  patches/0010-render-covered-windows-get-frame-callbacks-at-most-e.patch
+  patches/0011-output-after-a-mode-change-rendering-waits-at-most-2.patch
+  patches/0012-render-frame-callbacks-carry-the-output-s-predicted-.patch
+  patches/0013-xdg-shell-own-frame-windows-see-zoom-change-state.patch
+)
+sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP
+            SKIP)
 
 prepare() {
   ln -sf hyprland-source "$_archive"
   cd "$_archive"
   local p
-  # The patches live in the tree (image/hyprland/patches); makepkg finds local sources only beside
-  # the PKGBUILD, so they are applied from there rather than listed in source.
-  for p in "$startdir"/../../hyprland/patches/*.patch; do
+  for p in "$srcdir"/0*.patch; do
     echo "WolOS patch: ${p##*/}"
     patch -Np1 < "$p"
   done

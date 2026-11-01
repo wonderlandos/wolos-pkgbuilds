@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# wolos-system: everything WolOS adds to the Arch base, from this repo: the Rust binaries
-# (image/build-rust.sh), Hyprland plugins (image/hyprland/build-plugins.sh), desktop/overlay,
-# image/files (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
+# wolos-system: everything WolOS adds to the Arch base, from github.com/wonderlandos/wolos: the Rust
+# binaries (tools/build-rust.sh), Hyprland plugins (desktop/hyprland/build-plugins.sh), desktop/overlay,
+# files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
-pkgver=$(awk '/^## [0-9]/ {print $2; exit}' "$startdir/../../../CHANGELOG.md")
-pkgrel=1
+pkgver=0.11.4  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=2
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -20,21 +20,35 @@ options=(!debug !lto)
 backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf
   etc/zsh/zshenv)
 install=wolos-system.install
-_repo=$(cd "$startdir/../../.." && pwd)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
+_wolos_commit=ed35995f751ae48e306cadfd052e08416a6c2a37
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git")
+sha256sums=(SKIP SKIP SKIP)
+
+prepare() {
+  cd "$srcdir/wolos"
+  git submodule init
+  git config submodule.design.url "$srcdir/wolos-brand"
+  git config submodule.crates/shell.url "$srcdir/wolos-shell"
+  git -c protocol.file.allow=always submodule update
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
 
 build() {
+  local _repo=$srcdir/wolos
   export CARGO_TARGET_DIR=$srcdir/target
-  "$_repo/image/build-rust.sh" "$srcdir/stage"
-  "$_repo/image/hyprland/build-plugins.sh" "$srcdir/stage"
+  "$_repo/tools/build-rust.sh" "$srcdir/stage"
+  "$_repo/desktop/hyprland/build-plugins.sh" "$srcdir/stage"
 }
 
 package() {
+  local _repo=$srcdir/wolos
   cp -a "$srcdir/stage/." "$pkgdir/"
   (cd "$_repo/desktop/overlay" && tar --exclude ./usr/local -cf - .) | tar -C "$pkgdir" --no-same-owner -xf -
-  (cd "$_repo/image/files" && cp -a --no-preserve=ownership . "$pkgdir/")
+  (cd "$_repo/files" && cp -a --no-preserve=ownership . "$pkgdir/")
   rm "$pkgdir/usr/share/wolos/os-release"   # wolos-base owns it
-  install -Dm755 "$_repo/image/hw/verify-gpu.sh" "$pkgdir/usr/lib/wolos/verify-gpu.sh"
-  install -Dm755 "$_repo/image/arch/wolos-update-slot" "$pkgdir/usr/bin/wolos-update-slot"
   local d=$_repo/design
   [ ! -d "$d/icons" ] || sh "$d/icons/install.sh" "$pkgdir/usr/share/icons/WolOS"
   [ ! -d "$d/wallpapers" ] || { install -d "$pkgdir/usr/share/wolos/wallpapers"; cp -R "$d/wallpapers/." "$pkgdir/usr/share/wolos/wallpapers/"; }

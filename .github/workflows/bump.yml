@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos pushed to main (its ci.yml sends repository_dispatch `wolos-main` with the commit): pin the
+# recipes built from wolos to that commit (tools/bump-wolos.sh) and open a pull request, never a
+# direct push. Merging it releases that code into [wolos-testing] (build.yml, publish.yml).
+name: bump
+
+on:
+  repository_dispatch:
+    types: [wolos-main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: wolos commit to pin
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ inputs.sha || github.event.client_payload.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin and open a pull request
+        run: |
+          case $SHA in '' | *[!0-9a-f]*) echo "::error::not a commit: $SHA"; exit 1 ;; esac
+          tools/bump-wolos.sh "$SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          if git diff --quiet; then echo "already at $SHA"; exit 0; fi
+          b=bump/wolos-${SHA:0:12}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$b"
+          git commit -qam "Bump wolos to ${SHA:0:12}" \
+            -m "Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          git push -f origin "$b"
+          gh pr view "$b" >/dev/null 2>&1 ||
+            gh pr create --head "$b" --title "Bump wolos to ${SHA:0:12}" \
+              --body "Pins the recipes built from https://github.com/wonderlandos/wolos/commit/$SHA (tools/bump-wolos.sh)."

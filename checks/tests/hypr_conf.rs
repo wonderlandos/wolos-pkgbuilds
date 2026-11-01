@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+//! The desktop hyprland.conf drives hyprbars and window animations; it must agree with the
+//! realtime geometry/curves and the kit (12 px lights, close centre 22.5 px in, 22 px apart).
+//! Live 0.56.2: lights were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
+//! open animation used a 400 ms overshooting spring instead of our ease-out.
+#![allow(dead_code, unused_imports)]
+#[path = "support/siblings.rs"]
+mod siblings;
+
+const CONF: &str = include_str!("../../../desktop/overlay/usr/share/wolos/hypr/hyprland.conf");
+
+fn value(key: &str) -> String {
+    CONF.lines()
+        .map(str::trim)
+        .find_map(|l| {
+            l.strip_prefix(key)?
+                .trim()
+                .strip_prefix('=')
+                .map(|v| v.trim().to_owned())
+        })
+        .unwrap_or_else(|| panic!("{key} missing"))
+}
+
+/// Live: two Hyprland banners on a fresh session ("started without start-hyprland",
+/// ".conf ... removed in 0.57"). Customers must never see compositor nags.
+#[test]
+fn session_starts_hyprland_without_nag_banners() {
+    let session = include_str!("../../../desktop/overlay/usr/bin/wol-session");
+    let launch = session
+        .lines()
+        .rev()
+        .find(|l| l.starts_with("exec "))
+        .unwrap();
+    // On the user bus inside a logind session, else a private bus: always through start-hyprland.
+    assert_eq!(launch, "exec ${bus:+$bus --} start-hyprland");
+    // hyprland-guiutils is not in the image: its "missing" banner must be off.
+    assert_eq!(value("disable_hyprland_guiutils_check"), "true");
+    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let patches: String = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
+    assert!(
+        patches.lines().any(|l| l.starts_with('-') && l.contains("TXT_KEY_NOTIF_OUTDATED_CONFIG), CHyprColor")),
+        "fork patch must drop the .conf deprecation notification (0.56 pin keeps .conf)"
+    );
+}
+
+/// Live: libadwaita drew Text Editor's minimise light disabled; Hyprland 0.56 never advertised
+/// the minimise capability and ignored set_minimized.
+#[test]
+fn fork_makes_client_minimise_real() {
+    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let patches: String = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
+    let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
+    assert!(added("XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE"));
+    assert!(added("requestsMinimize") && added("special:hidden"));
+}
+
+/// Live: `focuswindow` (switcher, menu actions) focused a floating window but left it behind
+/// another; wol-hypr raises the window that becomes active.
+#[test]
+fn own_frame_windows_see_zoom_change_state() {
+    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let patches: String = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
+    let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
+    // Live on Helium 0.20.2.1: the zoom button zoomed once and then did nothing, because every
+    // window stays "maximized" from its first map and so zooming changed no state.
+    assert!(added("wantsClientSide(TOPLEVEL->wlToplevel())"));
+    assert!(added("TOPLEVEL->setMaximized(false);"));
+    assert!(added("->setMaximized(true);"));
+    // Dropping the map-time state instead gives clients shadow margins: windows land 10 to 20 px
+    // off and clipped (measured on Helium and libadwaita).
+    assert!(
+        !patches
+            .lines()
+            .any(|l| l.starts_with('-') && l.contains("m_toplevel->setMaximized(true);"))
+    );
+}
+
+/// The keys must exist in the fork, or Hyprland reports a config error at login.
+#[test]
+fn fork_registers_the_frame_policy_keys() {
+    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let patches: String = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
+    for k in [
+        "misc:throttle_occluded",
+        "misc:throttle_window_count",
+        "misc:throttle_occlusion_cutoff",
+        "misc:throttle_freeze_ms",
+        "misc:throttle_freeze_updates",
+        "misc:reconfigure_ack_timeout_ms",
+        "misc:frame_deadline",
+    ] {
+        assert!(
+            patches.contains("+        MS<") && patches.contains(&format!("\"{k}\"")),
+            "{k}"
+        );
+    }
+}

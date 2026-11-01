@@ -1,0 +1,12 @@
+# makepkg / wolos-build output
+*.pkg.tar.zst
+*.pkg.tar.zst.sig
+*/src/
+*/pkg/
+*/linux/
+*/wolos/
+*/wolos-brand/
+*/wolos-shell/
+*/Hyprland-*.tar.gz
+wolos-base/base.manifest
+checks/target/

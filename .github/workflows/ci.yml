@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Recipe rules, shell checks and the contract tests (checks/, with wolos and wolos-iso checked out
+# next to this repo: checks/tests/support/siblings.rs). Light: a GitHub runner, no package build.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: wolos-pkgbuilds
+      - uses: actions/checkout@v4
+        with:
+          repository: wonderlandos/wolos
+          path: wolos
+      - uses: actions/checkout@v4
+        with:
+          repository: wonderlandos/wolos-iso
+          path: wolos-iso
+      - name: Recipe rules
+        run: wolos-pkgbuilds/tools/lint.sh
+      - name: shellcheck
+        working-directory: wolos-pkgbuilds
+        run: shellcheck -S error tools/*.sh wolos-base/*.sh linux-wolos/prepare.sh linux-wolos/kmi/kmi.sh
+      - name: Contract tests
+        run: cargo test --manifest-path wolos-pkgbuilds/checks/Cargo.toml

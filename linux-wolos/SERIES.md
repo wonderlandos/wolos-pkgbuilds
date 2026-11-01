@@ -4,8 +4,8 @@ Shape (like Android's common kernel): stable core + small WolOS series + fixed u
 
 | layer | where |
 |---|---|
-| stable core | github.com/wonderlandos/linux at the ref pinned by `kernel/linux-wolos/PKGBUILD` (public) |
-| config | `kernel/conf/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
+| stable core | github.com/wonderlandos/linux at the ref pinned by `linux-wolos/PKGBUILD` (public) |
+| config | `linux-wolos/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
 | perf series | `linux/patches/*.patch`, applied in name order by the PKGBUILD |
 | scheduler | `scx_wolos/` (sched_ext BPF + loader + unit); interface: `scx_wolos/INTERFACE.md` |
 | KMI | `kmi/` symbol freeze per release line |
@@ -54,7 +54,7 @@ Rules: one concern per patch, < 100 lines, each with a header comment and a runt
 ## WolKernel userspace ABI rules
 
 - Anything that runs on stock Arch runs here: 32-bit, Wine (modify_ldt, binfmt_misc), Flatpak/AppImage/Snap, Docker/Podman, KVM/VirtualBox, Chromium sandbox, DKMS (nvidia, zfs, v4l2loopback).
-- Removed (public list: `kernel/abi-removed.txt`):
+- Removed (public list: `linux-wolos/abi-removed.txt`):
   - x32 ABI: glibc/musl ship x32 only as a separate target; Arch, Flatpak runtimes, Docker images and Steam have no x32 binaries.
   - Everything else Arch already disables (uselib, sysfs(2), legacy PTYs, TIOCSTI, uevent helper, COMPAT_BRK). vsyscall emulation and ioperm stay: old static binaries and Wine/DOS tools still use them.
 - Added: only `<linux/wolos.h>` + `/sys/kernel/wolos`. `abi_version` increments on any change; fields are never repurposed.

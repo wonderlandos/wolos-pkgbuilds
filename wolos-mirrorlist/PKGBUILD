@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # wolos-mirrorlist: where pacman finds [wolos] and [wolos-cachy] (ADR 0019). The date is the
-# release's snapshot (image/arch/snapshot); `wol update` moves it, `wol mirror rank` reorders it.
+# release's snapshot (wolos-iso/profile/snapshot); `wol update` moves it, `wol mirror rank` reorders it.
 pkgname=wolos-mirrorlist
 pkgver=2026.10.31
 pkgrel=1

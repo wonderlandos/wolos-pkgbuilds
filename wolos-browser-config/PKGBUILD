@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# wolos-browser-config: browser defaults and theme loader. Not in the image and not in image/repo/packages.
+# wolos-browser-config: browser defaults and theme loader. Not in the image and not in packages.
 pkgname=wolos-browser-config
 pkgver=1
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS browser defaults'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
-source=(wolos.cfg autoconfig.js policies.json)
-sha256sums=(SKIP SKIP SKIP)
+# The files live with the code that generates and tests them: wolos desktop/browser-config.
+_wolos_commit=ed35995f751ae48e306cadfd052e08416a6c2a37
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+makedepends=(git)
 
 package() {
+  cd "$srcdir/wolos/desktop/browser-config"
   install -Dm644 wolos.cfg "$pkgdir/usr/lib/firefox/wolos.cfg"
   install -Dm644 autoconfig.js "$pkgdir/usr/lib/firefox/defaults/pref/autoconfig.js"
   install -Dm644 policies.json "$pkgdir/usr/lib/firefox/distribution/policies.json"

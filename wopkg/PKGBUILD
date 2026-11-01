@@ -1,21 +1,36 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # wopkg: one package tool for every source (ADR 0021). The Crystal CLI (wopkg/) on libwopkg
-# (crates/wopkg, stable C ABI, libwopkg.so.1), built from this repo; shell completions and the
+# (crates/wopkg, stable C ABI, libwopkg.so.1), built from github.com/wonderlandos/wolos; shell completions and the
 # official recipes ship with it.
 pkgname=wopkg
-pkgver=$(sed -n 's/^version: //p' "$startdir/../../../wopkg/shard.yml")
-pkgrel=1
+pkgver=0.1.0  # wopkg/shard.yml at _wolos_commit
+pkgrel=2
 pkgdesc='WolOS package tool: pacman repos, Flatpak, AppImage, recipes and AUR in one command'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(gc pcre2 openssl zlib gcc-libs glibc bubblewrap git gnupg libarchive)
 optdepends=('flatpak: Flatpak apps' 'base-devel: building AUR packages' 'wolos-system: malware check of third-party downloads' 'strace: system-call trace of AUR builds')
-makedepends=(cargo crystal)
+makedepends=(cargo crystal git)
 options=(!debug !lto)
-_repo=$(cd "$startdir/../../.." && pwd)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
+_wolos_commit=ed35995f751ae48e306cadfd052e08416a6c2a37
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git")
+sha256sums=(SKIP SKIP SKIP)
+
+prepare() {
+  cd "$srcdir/wolos"
+  git submodule init
+  git config submodule.design.url "$srcdir/wolos-brand"
+  git config submodule.crates/shell.url "$srcdir/wolos-shell"
+  git -c protocol.file.allow=always submodule update
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
 
 build() {
+  local _repo=$srcdir/wolos
   cd "$_repo"
   CARGO_TARGET_DIR=$srcdir/target cargo build -p wopkg -p aurlaws --release --locked -j4
   crates/wopkg/link.sh "$srcdir/target/release/libwopkg.a" "$srcdir/lib"
@@ -25,11 +40,13 @@ build() {
 }
 
 check() {
+  local _repo=$srcdir/wolos
   cd "$_repo/wopkg"
   crystal spec --link-flags "-L$srcdir/lib -Wl,-rpath,$srcdir/lib"
 }
 
 package() {
+  local _repo=$srcdir/wolos
   install -Dm755 "$srcdir/wopkg" "$pkgdir/usr/bin/wopkg"
   install -Dm755 "$srcdir/target/release/wopkg-aurlaws" "$pkgdir/usr/bin/wopkg-aurlaws"
   install -Dm755 "$srcdir/lib/libwopkg.so.1" "$pkgdir/usr/lib/libwopkg.so.1"

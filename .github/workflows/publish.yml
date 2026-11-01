@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# After a successful build.yml run: sign its unsigned packages, merge them into [wolos-testing]
+# (repo-add, signed database), upload them as the assets of release `wolos-testing` in
+# vars.WOLOS_RELEASES_REPO and push them to the CDN (wolos-build publish testing). With promote.yml
+# the only place that holds the package key.
+# Secrets: WOLOS_GPG_KEY (armored gpg secret key), WOLOS_RELEASES_TOKEN, WOLOS_CDN_TOKEN,
+# WOLOS_BUILD_TOKEN. Variables: WOLOS_CDN_URL, WOLOS_RELEASES_REPO.
+name: publish
+
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read   # the build run's artifact
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ vars.WOLOS_RELEASES_REPO || 'wonderlandos/wolos-packages' }}
+      GH_TOKEN: ${{ secrets.WOLOS_RELEASES_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true   # a build with nothing changed uploads no artifact
+        with:
+          name: unsigned-packages
+          path: out/built
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Anything to publish
+        id: any
+        run: |
+          if compgen -G 'out/built/*.pkg.tar.zst' >/dev/null; then echo "yes=1" >> "$GITHUB_OUTPUT"; else echo "nothing built"; fi
+      - uses: actions/checkout@v4
+        if: steps.any.outputs.yes == '1'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          path: wolos-pkgbuilds
+      - uses: actions/checkout@v4
+        if: steps.any.outputs.yes == '1'
+        with:
+          repository: wonderlandos/wolos-build
+          token: ${{ secrets.WOLOS_BUILD_TOKEN }}
+          path: wolos-build
+
+      - name: Sign, index, upload to [wolos-testing], CDN
+        if: steps.any.outputs.yes == '1'
+        env:
+          GPG_KEY: ${{ secrets.WOLOS_GPG_KEY }}
+          WOLOS_CDN_TOKEN: ${{ secrets.WOLOS_CDN_TOKEN }}
+          WOLOS_CDN_URL: ${{ vars.WOLOS_CDN_URL }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::WOLOS_RELEASES_TOKEN is not set"; exit 1; }
+          [ -n "$GPG_KEY" ] || { echo "::error::WOLOS_GPG_KEY is not set: [wolos-testing] would be unsigned"; exit 1; }
+          # repo-add and the pacman tools: an archlinux container with the runner's gh and the key.
+          docker run --rm -v "$PWD:/src" -w /src -v "$(command -v gh):/usr/local/bin/gh:ro" \
+            -e GPG_KEY -e GH_REPO -e GH_TOKEN -e WOLOS_CDN_TOKEN -e WOLOS_CDN_URL archlinux:base-devel bash -euo pipefail -c '
+              pacman -Sy --noconfirm --needed git gnupg python libarchive >/dev/null
+              git config --global --add safe.directory "*"
+              echo "$GPG_KEY" | gpg --batch --import
+              export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")
+              WOLOS_PKGBUILDS=/src/wolos-pkgbuilds WOLOS_WORK=/src/out/work wolos-build/wolos-build publish testing out/built
+            '
