@@ -4,7 +4,7 @@
 # The result is an artifact of unsigned packages; publish.yml signs and publishes it. The runner never
 # builds: there is no GitHub-runner fallback.
 # Variables: AWS_ROLE_ARN, AWS_REGION, CLUSTER, TASK_DEF, CAPACITY, BUCKET (OIDC), WOLOS_RELEASES_REPO.
-# Secrets: WOLOS_BUILD_TOKEN (reads the private wonderlandos/wolos-build).
+# The tool runs from the builder image (.github/builder, .github/builder-image; ECR over OIDC).
 name: build
 
 on:
@@ -37,11 +37,6 @@ jobs:
         with:
           fetch-depth: 0
           path: wolos-pkgbuilds
-      - uses: actions/checkout@v4
-        with:
-          repository: wonderlandos/wolos-build
-          token: ${{ secrets.WOLOS_BUILD_TOKEN }}
-          path: wolos-build
 
       - name: Recipe rules
         run: wolos-pkgbuilds/tools/lint.sh
@@ -62,6 +57,9 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      # The tool: the builder image (.github/builder-image), not a checkout of the private repo.
+      - name: Builder registry
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build on the cluster
         env:
@@ -77,7 +75,7 @@ jobs:
           if [ -n "$PACKAGES" ]; then set -- $PACKAGES
           elif [ -n "$BASE" ]; then set -- --changed "$BASE"
           else set --; fi   # first publish: every package
-          wolos-build/wolos-build pkg --ecs --deps out/deps --out out/built "$@"
+          wolos-pkgbuilds/.github/builder wolos-build pkg --ecs --deps out/deps --out out/built "$@"
           git -C wolos-pkgbuilds rev-parse HEAD > out/built/built-from
           echo "built: $(cd out/built && ls ./*.pkg.tar.zst 2>/dev/null | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
 
