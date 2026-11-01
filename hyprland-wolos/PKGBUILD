@@ -3,7 +3,7 @@
 # applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
-pkgrel=2
+pkgrel=3
 pkgdesc='Hyprland compositor with the WolOS patches'
 arch=(x86_64)
 url='https://github.com/hyprwm/Hyprland'
@@ -32,6 +32,7 @@ source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.g
   0011-output-after-a-mode-change-rendering-waits-at-most-2.patch
   0012-render-frame-callbacks-carry-the-output-s-predicted-.patch
   0013-xdg-shell-own-frame-windows-see-zoom-change-state.patch
+  0014-session-lock-a-dead-locker-leaves-black-while-one-can.patch
 )
 sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
             SKIP
@@ -46,7 +47,8 @@ sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
             SKIP
             SKIP
             SKIP
-            SKIP)
+            SKIP
+            9a4de22075f3208e6f4be3ec1fe006b75852fe0efe9bb36aef268fe4dba20017)
 
 prepare() {
   ln -sf hyprland-source "$_archive"
