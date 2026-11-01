@@ -2,6 +2,9 @@
 # wolos pushed to main (its ci.yml sends repository_dispatch `wolos-main` with the commit): pin the
 # recipes built from wolos to that commit (tools/bump-wolos.sh) and open a pull request, never a
 # direct push. Merging it releases that code into [wolos-testing] (build.yml, publish.yml).
+# Secret: WOLOS_PKGBUILDS_TOKEN (contents + pull requests on this repo). The branch is pushed and the
+# pull request opened with it, not github.token: events made with github.token start no workflow, so
+# ci.yml would never run on the bump.
 name: bump
 
 on:
@@ -22,9 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SHA: ${{ inputs.sha || github.event.client_payload.sha }}
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.WOLOS_PKGBUILDS_TOKEN }}
     steps:
+      - name: Token
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::WOLOS_PKGBUILDS_TOKEN is not set: a bump pull request made with github.token gets no ci run"; exit 1; }
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WOLOS_PKGBUILDS_TOKEN }}
       - name: Pin and open a pull request
         run: |
           case $SHA in '' | *[!0-9a-f]*) echo "::error::not a commit: $SHA"; exit 1 ;; esac
