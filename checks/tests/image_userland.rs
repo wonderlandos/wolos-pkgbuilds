@@ -65,7 +65,7 @@ fn sudo_works_on_every_system() {
 
 #[test]
 fn files_offers_clamav_and_the_action_can_only_start_wol_analyze() {
-    let root = std::path::siblings::root();
+    let root = siblings::root();
     let read = |p: &str| std::fs::read_to_string(root.join(p)).unwrap();
     let c = read("desktop/nautilus/wolos-analyze.c");
     assert!(c.contains("\"Analyze with ClamAV\""));

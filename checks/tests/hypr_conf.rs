@@ -7,10 +7,14 @@
 #[path = "support/siblings.rs"]
 mod siblings;
 
-const CONF: &str = include_str!("../../../desktop/overlay/usr/share/wolos/hypr/hyprland.conf");
+/// wolos desktop/overlay/usr/share/wolos/hypr/hyprland.conf (a sibling repo: read at run time).
+fn conf() -> String {
+    let p = format!("{}/desktop/overlay/usr/share/wolos/hypr/hyprland.conf", siblings::root_str());
+    std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{p}: {e}"))
+}
 
 fn value(key: &str) -> String {
-    CONF.lines()
+    conf().lines()
         .map(str::trim)
         .find_map(|l| {
             l.strip_prefix(key)?
@@ -25,7 +29,8 @@ fn value(key: &str) -> String {
 /// ".conf ... removed in 0.57"). Customers must never see compositor nags.
 #[test]
 fn session_starts_hyprland_without_nag_banners() {
-    let session = include_str!("../../../desktop/overlay/usr/bin/wol-session");
+    let session = std::fs::read_to_string(format!("{}/desktop/overlay/usr/bin/wol-session", siblings::root_str()))
+        .expect("wolos desktop/overlay/usr/bin/wol-session");
     let launch = session
         .lines()
         .rev()

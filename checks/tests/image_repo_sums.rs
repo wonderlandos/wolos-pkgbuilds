@@ -28,8 +28,10 @@ fn sha256(p: &Path) -> String {
 fn local_sources_match_their_sums() {
     let mut bad = Vec::new();
     let mut seen = 0;
-    for dir in ["image/repo", "kernel"] {
-        for e in std::fs::read_dir(root().join(dir)).unwrap() {
+    // Every recipe directory of this repo (one per package).
+    let own = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/.."));
+    {
+        for e in std::fs::read_dir(own).unwrap() {
             let d = e.unwrap().path();
             if !d.join("PKGBUILD").is_file() {
                 continue;

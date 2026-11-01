@@ -28,18 +28,23 @@ fn hyprland_fork_and_system_package_recipes() {
         "provides=(hyprland",
         "conflicts=(hyprland",
         "pkgver=0.56.2",
-        "../../hyprland/patches/",
         "patch -Np1",
     ] {
         assert!(h.contains(want), "hyprland-wolos lacks {want}");
     }
-    // makepkg finds local sources only beside the PKGBUILD: the patches are applied from $startdir.
-    let source = h.lines().find(|l| l.starts_with("source=")).unwrap();
-    assert!(
-        !source.contains("patch"),
-        "patches listed in source: {source}"
-    );
-    assert!(h.contains("\"$startdir\"/../../hyprland/patches/"));
+    // The patches are local sources beside the PKGBUILD (a clean chroot sees nothing else): every
+    // patches/*.patch is listed, and the recipe reaches no sibling checkout.
+    let dir = repo("hyprland-wolos/patches");
+    let mut n = 0;
+    for e in fs::read_dir(&dir).unwrap() {
+        let name = e.unwrap().file_name().into_string().unwrap();
+        if name.ends_with(".patch") {
+            n += 1;
+            assert!(h.contains(&format!("patches/{name}")), "hyprland-wolos source lacks {name}");
+        }
+    }
+    assert!(n > 0, "no patches in {}", dir.display());
+    assert!(!h.contains("$startdir\"/.."), "hyprland-wolos reaches outside its directory");
     let w = read("wolos-system/PKGBUILD");
     for want in [
         "pkgname=wolos-system",
@@ -96,7 +101,8 @@ fn wolos_base_is_one_versioned_base() {
         !b.lines()
             .any(|l| l.starts_with("source=") && l.contains("../"))
     );
-    assert!(b.contains("\"$startdir/../../files/usr/share/wolos/os-release\""));
+    // From the pinned wolos source, not a sibling checkout.
+    assert!(b.contains("\"$srcdir/wolos/files/usr/share/wolos/os-release\""));
     let os = read("files/usr/share/wolos/os-release");
     assert!(os.contains("ID=wolos") && os.contains("ID_LIKE=arch"));
     assert!(
