@@ -5,6 +5,7 @@
 # Code from github.com/wonderlandos/wolos reaches a package only through its pinned _wolos_commit,
 # so a change there is a change of the package directory (bump-wolos.sh).
 linux-wolos    linux-wolos          -                                       linux-wolos/
+linux-wolos-v3 linux-wolos          -                                       linux-wolos/
 linux-wolos-api-headers linux-wolos-api-headers -                         linux-wolos-api-headers/ linux-wolos/VERSION
 hyprland-wolos hyprland-wolos       -                                       hyprland-wolos/
 flatpak-wolos  flatpak-wolos        -                                       flatpak-wolos/
