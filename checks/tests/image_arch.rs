@@ -33,14 +33,14 @@ fn hyprland_fork_and_system_package_recipes() {
         assert!(h.contains(want), "hyprland-wolos lacks {want}");
     }
     // The patches are local sources beside the PKGBUILD (a clean chroot sees nothing else): every
-    // patches/*.patch is listed, and the recipe reaches no sibling checkout.
-    let dir = repo("hyprland-wolos/patches");
+    // 0*.patch beside it is listed, and the recipe reaches no sibling checkout.
+    let dir = repo("hyprland-wolos");
     let mut n = 0;
     for e in fs::read_dir(&dir).unwrap() {
         let name = e.unwrap().file_name().into_string().unwrap();
         if name.ends_with(".patch") {
             n += 1;
-            assert!(h.contains(&format!("patches/{name}")), "hyprland-wolos source lacks {name}");
+            assert!(h.lines().any(|l| l.trim() == name), "hyprland-wolos source lacks {name}");
         }
     }
     assert!(n > 0, "no patches in {}", dir.display());
@@ -102,7 +102,8 @@ fn wolos_base_is_one_versioned_base() {
             .any(|l| l.starts_with("source=") && l.contains("../"))
     );
     // From the pinned wolos source, not a sibling checkout.
-    assert!(b.contains("\"$srcdir/wolos/files/usr/share/wolos/os-release\""));
+    assert!(b.contains("files/usr/share/wolos/os-release\"") && b.contains("\"$srcdir/os-release-$_wolos_commit\""));
+    assert!(b.contains("_os_release_sha256="), "os-release has a checksum");
     let os = read("files/usr/share/wolos/os-release");
     assert!(os.contains("ID=wolos") && os.contains("ID_LIKE=arch"));
     assert!(

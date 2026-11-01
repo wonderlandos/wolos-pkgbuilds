@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# hyprland-wolos: Hyprland 0.56.2 (the snapshot's version) + the WolOS patches in patches/,
+# hyprland-wolos: Hyprland 0.56.2 (the snapshot's version) + the WolOS patches (0*.patch here),
 # applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
@@ -17,21 +17,21 @@ makedepends=(cmake glaze hyprland-protocols hyprwayland-scanner meson ninja xorg
 provides=(hyprland="$pkgver" wayland-compositor)
 conflicts=(hyprland)
 _archive="Hyprland-$pkgver"
-# The WolOS patches (patches/, applied in name order) are local sources like any Arch patch.
+# The WolOS patches (0*.patch beside this file, applied in name order) are local sources like any Arch patch.
 source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.gz"
-  patches/0001-animation-tick-once-per-monitor-frame-instead-of-eve.patch
-  patches/0002-renderer-arm-cursor-hide-ticker-for-the-timeout-5-s-.patch
-  patches/0003-config-no-.conf-deprecation-banner-WolOS-pins-0.56-w.patch
-  patches/0004-xdg-shell-advertise-minimise-client-minimise-moves-t.patch
-  patches/0005-session-lock-a-takeover-lock-hides-workspaces-from-i.patch
-  patches/0006-sendshortcut-keys-resolve-without-held-modifiers-the.patch
-  patches/0007-layer-shell-content-commits-damage-only-what-changed.patch
-  patches/0008-focus-restores-a-minimised-window-to-the-current-des.patch
-  patches/0009-direct-scanout-auto-mode-also-covers-fullscreen-vide.patch
-  patches/0010-render-covered-windows-get-frame-callbacks-at-most-e.patch
-  patches/0011-output-after-a-mode-change-rendering-waits-at-most-2.patch
-  patches/0012-render-frame-callbacks-carry-the-output-s-predicted-.patch
-  patches/0013-xdg-shell-own-frame-windows-see-zoom-change-state.patch
+  0001-animation-tick-once-per-monitor-frame-instead-of-eve.patch
+  0002-renderer-arm-cursor-hide-ticker-for-the-timeout-5-s-.patch
+  0003-config-no-.conf-deprecation-banner-WolOS-pins-0.56-w.patch
+  0004-xdg-shell-advertise-minimise-client-minimise-moves-t.patch
+  0005-session-lock-a-takeover-lock-hides-workspaces-from-i.patch
+  0006-sendshortcut-keys-resolve-without-held-modifiers-the.patch
+  0007-layer-shell-content-commits-damage-only-what-changed.patch
+  0008-focus-restores-a-minimised-window-to-the-current-des.patch
+  0009-direct-scanout-auto-mode-also-covers-fullscreen-vide.patch
+  0010-render-covered-windows-get-frame-callbacks-at-most-e.patch
+  0011-output-after-a-mode-change-rendering-waits-at-most-2.patch
+  0012-render-frame-callbacks-carry-the-output-s-predicted-.patch
+  0013-xdg-shell-own-frame-windows-see-zoom-change-state.patch
 )
 sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
             SKIP

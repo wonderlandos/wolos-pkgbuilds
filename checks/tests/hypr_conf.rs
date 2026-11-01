@@ -40,10 +40,12 @@ fn session_starts_hyprland_without_nag_banners() {
     assert_eq!(launch, "exec ${bus:+$bus --} start-hyprland");
     // hyprland-guiutils is not in the image: its "missing" banner must be off.
     assert_eq!(value("disable_hyprland_guiutils_check"), "true");
-    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let dir = format!("{}/hyprland-wolos", siblings::root_str());
     let patches: String = std::fs::read_dir(dir)
         .unwrap()
-        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "patch"))
+        .map(|p| std::fs::read_to_string(p).unwrap())
         .collect();
     assert!(
         patches.lines().any(|l| l.starts_with('-') && l.contains("TXT_KEY_NOTIF_OUTDATED_CONFIG), CHyprColor")),
@@ -55,10 +57,12 @@ fn session_starts_hyprland_without_nag_banners() {
 /// the minimise capability and ignored set_minimized.
 #[test]
 fn fork_makes_client_minimise_real() {
-    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let dir = format!("{}/hyprland-wolos", siblings::root_str());
     let patches: String = std::fs::read_dir(dir)
         .unwrap()
-        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "patch"))
+        .map(|p| std::fs::read_to_string(p).unwrap())
         .collect();
     let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
     assert!(added("XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE"));
@@ -69,10 +73,12 @@ fn fork_makes_client_minimise_real() {
 /// another; wol-hypr raises the window that becomes active.
 #[test]
 fn own_frame_windows_see_zoom_change_state() {
-    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let dir = format!("{}/hyprland-wolos", siblings::root_str());
     let patches: String = std::fs::read_dir(dir)
         .unwrap()
-        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "patch"))
+        .map(|p| std::fs::read_to_string(p).unwrap())
         .collect();
     let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
     // Live on Helium 0.20.2.1: the zoom button zoomed once and then did nothing, because every
@@ -92,10 +98,12 @@ fn own_frame_windows_see_zoom_change_state() {
 /// The keys must exist in the fork, or Hyprland reports a config error at login.
 #[test]
 fn fork_registers_the_frame_policy_keys() {
-    let dir = format!("{}/hyprland-wolos/patches", siblings::root_str());
+    let dir = format!("{}/hyprland-wolos", siblings::root_str());
     let patches: String = std::fs::read_dir(dir)
         .unwrap()
-        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "patch"))
+        .map(|p| std::fs::read_to_string(p).unwrap())
         .collect();
     for k in [
         "misc:throttle_occluded",

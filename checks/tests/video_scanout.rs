@@ -30,7 +30,7 @@ fn direct_scanout_and_vaapi_decode_are_on() {
 /// Upstream `direct_scanout = 2` scans out only content-type game: browser video kept compositing.
 #[test]
 fn fork_scans_out_fullscreen_video_and_tearing_games() {
-    let dir = siblings::root().join("hyprland-wolos/patches");
+    let dir = siblings::root().join("hyprland-wolos");
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -45,7 +45,7 @@ fn fork_scans_out_fullscreen_video_and_tearing_games() {
         assert!(names.iter().any(|n| n.starts_with(w)), "missing patch {w}");
     }
     let scanout = names.iter().find(|n| n.starts_with(want[2])).unwrap();
-    let p = read(&format!("hyprland-wolos/patches/{scanout}"));
+    let p = read(&format!("hyprland-wolos/{scanout}"));
     assert!(
         p.lines()
             .any(|l| l.starts_with('+') && l.contains("CONTENT_TYPE_VIDEO"))
