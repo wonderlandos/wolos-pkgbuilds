@@ -15,9 +15,10 @@ packaging repos. How packages are built and released: [BUILD.md](BUILD.md).
 | `tools/lint.sh` | recipe rules (own directory only, one wolos pin, versions agree) |
 | `checks/` | contract tests of these recipes (Rust, std only) |
 
-Workflows: `build.yml` (changed directories -> ECS -> unsigned artifact), `publish.yml` (sign,
-repo-add, `[wolos-testing]`, CDN), `promote.yml` (by hand: testing -> `[wolos]`), `bump.yml` (wolos
-pushed: pin it, as a pull request), `ci.yml` (lint, shellcheck, checks).
+Workflows: `build.yml` (changed directories -> ECS -> unsigned packages in S3), `bump.yml` (wolos
+pushed: pin it, as a pull request), `ci.yml` (lint, shellcheck, checks). `publish.yml` (sign,
+repo-add, `[wolos-testing]`, CDN) and `promote.yml` (testing -> `[wolos]`) are reusable workflows:
+they run from the publish button in wolos, where the signing keys live (wolos `BUILD.md`).
 
 License: GPL-2.0-or-later (`LICENSE`); each package states the license of what it ships, the kernel
 is GPL-2.0-only.
