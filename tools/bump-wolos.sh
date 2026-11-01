@@ -28,5 +28,9 @@ for p in $(grep -l '^_wolos_commit=' */PKGBUILD); do
     sed -i "s/^pkgrel=.*/pkgrel=$((rel + 1))/" "$p"
   fi
   sed -i "s/^_wolos_commit=.*/_wolos_commit=$sha/" "$p"
+  # wolos-base takes os-release as one checksummed file of that commit.
+  if grep -q "^_os_release_sha256=" "$p"; then
+    sed -i "s/^_os_release_sha256=.*/_os_release_sha256=$(show files/usr/share/wolos/os-release | sha256sum | cut -d" " -f1)/" "$p"
+  fi
   echo "$p: $old -> $sha ($(sed -n 's/^pkgver=\([^ ]*\).*/\1/p' "$p")-$(sed -n 's/^pkgrel=//p' "$p"))"
 done

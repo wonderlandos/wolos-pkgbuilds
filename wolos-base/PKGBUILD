@@ -23,11 +23,13 @@ provides=('coreutils=9.12' 'sudo' 'VIRTUALBOX-GUEST-MODULES')
 conflicts=('coreutils' 'sudo')
 backup=()
 install=wolos-base.install
-# os-release comes from the WolOS source (files/usr/share/wolos/os-release) at one commit.
+# os-release comes from the WolOS source (files/usr/share/wolos/os-release) at one commit, as one
+# file with its checksum (bump-wolos.sh moves both): no git, which --nodeps would not install.
 _wolos_commit=ed35995f751ae48e306cadfd052e08416a6c2a37
-source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+_os_release_sha256=1345cbb2d23dbb57949c6751baca359cf256b1e207941a194ba9fb6855cd46c9
+source=("os-release-$_wolos_commit::https://raw.githubusercontent.com/wonderlandos/wolos/$_wolos_commit/files/usr/share/wolos/os-release"
   wolos-os-release.hook base.manifest)
-sha256sums=(SKIP SKIP SKIP)
+sha256sums=("$_os_release_sha256" SKIP SKIP)
 
 # GNU coreutils 9.12 program names; uutils-coreutils ships each as uu-<name>.
 _coreutils=('[' b2sum base32 base64 basename basenc cat chgrp chmod chown chroot cksum comm cp csplit
@@ -48,7 +50,7 @@ package() {
   done
   # os-release of this release: /etc/os-release is written from it by the hook (filesystem owns
   # /usr/lib/os-release and the /etc symlink).
-  sed "s/@VERSION@/$pkgver/g" "$srcdir/wolos/files/usr/share/wolos/os-release" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/os-release"
+  sed "s/@VERSION@/$pkgver/g" "$srcdir/os-release-$_wolos_commit" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/os-release"
   install -Dm644 "$srcdir/wolos-os-release.hook" "$pkgdir/usr/share/libalpm/hooks/wolos-os-release.hook"
   echo "$pkgver" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/base.version"
   # Manifest last: it hashes the base packages and this package's own files.
