@@ -10,7 +10,10 @@ arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later CC-BY-NC-ND-4.0)
 # plymouth: installed first, so post_install can make the WolOS splash the theme.
-depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plymouth)
+# nftables: etc/wolos/nftables.conf runs nft; libnautilus-extension: the Files "Analyze with ClamAV"
+# extension (usr/lib/nautilus/extensions-4/libwolos-analyze.so) links it.
+depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plymouth nftables
+  libnautilus-extension)
 # Our cursor theme is the default one (usr/share/icons/default).
 provides=(default-cursors)
 conflicts=(default-cursors)
@@ -41,6 +44,8 @@ build() {
   export CARGO_TARGET_DIR=$srcdir/target
   "$_repo/tools/build-rust.sh" "$srcdir/stage"
   "$_repo/desktop/hyprland/build-plugins.sh" "$srcdir/stage"
+  # The stage has usr/local/bin/pacman (build-rust.sh: the sealed system's pacman, first on PATH,
+  # runs the real /usr/bin/pacman; ADR 0016). namcap flags /usr/local; kept, as published.
 }
 
 package() {
