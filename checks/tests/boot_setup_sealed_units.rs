@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+//! What this file checks (wolos-pkgbuilds): boot-setup recipes: the sealed system can not enable units at first start.
 //! boot-setup with every tool faked: which chain each tier gets and what it asks of the firmware.
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]

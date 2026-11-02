@@ -18,16 +18,19 @@ depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plym
 provides=(default-cursors)
 conflicts=(default-cursors)
 replaces=(default-cursors)
-makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus)
+makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus pipewire)
 options=(!debug !lto)
 backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf
   etc/zsh/zshenv)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
 _wolos_commit=1dcdea6e08525ce031d3b0587bdf850e2a0916c0
+# The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
+_brand_commit=743d616a733b8e91b86a10e735e41f180352dfb3
+_shell_commit=622a20a17321dfa9498237256a410b00b5f6f3b7
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
-  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git"
-  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git")
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
 sha256sums=(SKIP SKIP SKIP)
 
 prepare() {
@@ -69,6 +72,13 @@ package() {
   chmod 440 "$pkgdir/etc/sudoers"
   chmod 440 "$pkgdir/etc/sudoers.d/wolos"
   chmod 755 "$pkgdir"/usr/lib/wolos/* "$pkgdir"/usr/bin/*
+  # polkit reads rules only from a directory polkitd can read and others cannot: the same owner and
+  # mode Arch's polkit package gives it (root:102 = polkitd, 0750), so pacman sees no conflict.
+  if [ -d "$pkgdir/usr/share/polkit-1/rules.d" ]; then
+    chmod 750 "$pkgdir/usr/share/polkit-1/rules.d"
+    chown root:102 "$pkgdir/usr/share/polkit-1/rules.d"
+    chmod 644 "$pkgdir"/usr/share/polkit-1/rules.d/*.rules
+  fi
   # Rust and GPL-3.0 shell licenses travel with the package.
   install -Dm644 "$_repo/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

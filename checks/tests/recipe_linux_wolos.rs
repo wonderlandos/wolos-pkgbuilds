@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+//! What this file checks (wolos-pkgbuilds): The linux-wolos recipe: fork at its release tag, config fragment, flavours, version.
 //! linux-wolos (ADR 0016): the WolOS kernel fork at its release tag + Arch's config at the snapshot +
 //! the fork's `kernel/configs/wolos.config` (the only WolOS fragment; patches are commits on the fork).
 //! The config tests read that fragment from the fork at the tag: $WOLOS_LINUX, else ../linux next to

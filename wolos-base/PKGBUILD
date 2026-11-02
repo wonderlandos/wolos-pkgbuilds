@@ -29,7 +29,9 @@ _wolos_commit=1dcdea6e08525ce031d3b0587bdf850e2a0916c0
 _os_release_sha256=1345cbb2d23dbb57949c6751baca359cf256b1e207941a194ba9fb6855cd46c9
 source=("os-release-$_wolos_commit::https://raw.githubusercontent.com/wonderlandos/wolos/$_wolos_commit/files/usr/share/wolos/os-release"
   wolos-os-release.hook base.manifest)
-sha256sums=("$_os_release_sha256" SKIP SKIP)
+sha256sums=("$_os_release_sha256"
+            '6482e332e9e062e901cc297495395ef255baa9aa99b49b6cc6e29b4c8d327d10'
+            SKIP) # base.manifest: written by prebuild.sh at build time (tools/lint.sh exception)
 
 # GNU coreutils 9.12 program names; uutils-coreutils ships each as uu-<name>.
 _coreutils=('[' b2sum base32 base64 basename basenc cat chgrp chmod chown chroot cksum comm cp csplit

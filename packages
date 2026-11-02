@@ -15,4 +15,5 @@ wolos-system   wolos-system         hyprland-wolos                          wolo
 wopkg          wopkg                -                                       wopkg/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/
+obs-pipewire-audio-capture obs-pipewire-audio-capture -                 obs-pipewire-audio-capture/
 wolos-base     wolos-base           linux-wolos,linux-wolos-api-headers,hyprland-wolos,wolos-system  wolos-base/ snapshot pacman.conf

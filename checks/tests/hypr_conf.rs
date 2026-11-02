@@ -82,8 +82,11 @@ fn own_frame_windows_see_zoom_change_state() {
         .collect();
     let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
     // Live on Helium 0.20.2.1: the zoom button zoomed once and then did nothing, because every
-    // window stays "maximized" from its first map and so zooming changed no state.
-    assert!(added("wantsClientSide(TOPLEVEL->wlToplevel())"));
+    // window stays "maximized" from its first map and so zooming changed no state. Every toplevel
+    // with an xdg-decoration object (client- or server-side frame: Chromium, Qt, SDL) gets the
+    // state dropped for one configure; GTK creates none and keeps it (docs/modules/hyprland-fork.md).
+    assert!(added("seesZoomState(TOPLEVEL->wlToplevel())"));
+    assert!(added("return m_decorations.contains(toplevel);"));
     assert!(added("TOPLEVEL->setMaximized(false);"));
     assert!(added("->setMaximized(true);"));
     // Dropping the map-time state instead gives clients shadow margins: windows land 10 to 20 px

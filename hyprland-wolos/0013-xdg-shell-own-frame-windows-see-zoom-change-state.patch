@@ -1,11 +1,14 @@
 From: kleeedolinux <71413974+kleeedolinux@users.noreply.github.com>
-Subject: [PATCH] xdg-shell: own-frame windows see zoom change state
+Subject: [PATCH] xdg-shell: decorated toplevels see zoom change state
 
 Every toplevel stays maximized from its first map so that it draws no shadow
 margins, so zooming changes no state a client can see. Chromium and Electron
 then ignore their next zoom click: Helium zoomed once and could not be
-restored. Windows that asked for a client-side frame get the state dropped for
-one configure. GTK never creates a decoration object and is not affected.
+restored. Every toplevel that created an xdg-decoration object (asked for a
+client- or a server-side frame: Chromium, Qt, SDL) gets the state dropped for
+one configure, so its own maximized state follows zoom. GTK never creates a
+decoration object and keeps the sticky state: unmaximized, GTK draws shadow
+margins and rounded corners under the compositor's bar.
 
 ---
 --- a/src/desktop/view/Window.cpp
@@ -26,10 +29,10 @@ one configure. GTK never creates a decoration object and is not affected.
 +
 +            // WolOS: every toplevel stays "maximized" from its first map so that it draws no shadow
 +            // margins, so zooming changes no state a client can see. Chromium and Electron then
-+            // ignore their next zoom click. Windows with their own frame get the state dropped
-+            // for one configure.
++            // ignore their next zoom click. Toplevels with a decoration object (client- or
++            // server-side frame) get the state dropped for one configure; GTK (none) would flash shadows.
 +            const auto TOPLEVEL = m_xdgSurface ? m_xdgSurface->m_toplevel.lock() : nullptr;
-+            if (TOPLEVEL && PROTO::xdgDecoration->wantsClientSide(TOPLEVEL->wlToplevel())) {
++            if (TOPLEVEL && PROTO::xdgDecoration->seesZoomState(TOPLEVEL->wlToplevel())) {
 +                TOPLEVEL->setMaximized(false);
 +                g_pEventLoopManager->doLater([w = m_self] {
 +                    const auto W = w.lock();
@@ -46,10 +49,10 @@ one configure. GTK never creates a decoration object and is not affected.
  
  class CXDGDecorationProtocol : public IWaylandProtocol {
    public:
-+    // WolOS: this toplevel asked to draw its own frame.
-+    bool wantsClientSide(wl_resource* toplevel) {
-+        const auto it = m_decorations.find(toplevel);
-+        return it != m_decorations.end() && it->second->mostRecentlyRequested == ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
++    // WolOS: this toplevel created a decoration object (asked for a client- or server-side frame),
++    // so it can tell a zoom from a resize. GTK never does and would draw shadows when unmaximized.
++    bool seesZoomState(wl_resource* toplevel) {
++        return m_decorations.contains(toplevel);
 +    }
 +
      CXDGDecorationProtocol(const wl_interface* iface, const int& ver, const std::string& name);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+//! What this file checks (wolos-pkgbuilds): Userland recipes: sudo for administrators on every system, the Files ClamAV action that can only start wol analyze.
 //! Everyday userland from the real-GPU run: sudo for administrators, zsh for every account, user
 //! folders, unlocked keyring, printing, removable media and default apps (Helium the browser).
 //! Scripts run on the host with fakes.

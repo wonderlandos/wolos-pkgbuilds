@@ -15,18 +15,20 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: wolos-pkgbuilds
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: wonderlandos/wolos
           path: wolos
           submodules: true   # design/ (wolos-brand): the splash and icons wolos-system installs
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: wonderlandos/wolos-iso
           path: wolos-iso
+      - name: Pin lint (uses @sha, images @sha256; wolos/tools/ci/pin-lint.py)
+        run: python3 wolos/tools/ci/pin-lint.py wolos-pkgbuilds
       - name: Recipe rules
         run: wolos-pkgbuilds/tools/lint.sh
       - name: shellcheck
@@ -34,7 +36,7 @@ jobs:
         run: shellcheck -S error tools/*.sh wolos-base/*.sh linux-wolos/prepare.sh linux-wolos/kmi/kmi.sh
       - name: The fork's config fragment at the pinned tag (tarball checksum = the recipe's)
         # The kernel config tests read kernel/configs/wolos.config of the tag linux-wolos builds
-        # (checks/tests/kernel_linux.rs), so a moved tag or a fragment that drops an option fails here.
+        # (checks/tests/recipe_linux_wolos.rs), so a moved tag or a fragment that drops an option fails here.
         working-directory: wolos-pkgbuilds/linux-wolos
         run: |
           read -r tag sum < <(bash -c 'startdir=$PWD; source ./PKGBUILD >/dev/null; echo "$_tag ${sha256sums[0]}"')

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+//! What this file checks (wolos-pkgbuilds): Recipes of the Hyprland fork, wolos-system and the one versioned wolos-base.
 //! The Arch Linux image (ADR 0016): mkarchiso profile `profile`, pinned to one Arch Linux Archive
 //! date, `[wolos]` before the Arch repos, linux-wolos only, the `[wolos]` repo build and the release
 //! manifest. Scripts run against fakes; nothing here needs root or the network.

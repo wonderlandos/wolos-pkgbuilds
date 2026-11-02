@@ -25,7 +25,8 @@ source=(
   "$_srcname.tar.gz::$url/archive/$_commit.tar.gz"
   https://dl.flathub.org/repo/flathub.flatpakrepo
 )
-sha256sums=(SKIP SKIP)
+sha256sums=('26571f0ca8c17ccd29c5882b8f603ca2072e046ebc0bd960a34615f2b1179f65'
+            '3371dd250e61d9e1633630073fefda153cd4426f72f4afa0c3373ae2e8fea03a')
 
 build() {
   arch-meson "$_srcname" build \

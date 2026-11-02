@@ -1,0 +1,3 @@
+# CachyOS package signing key (ADR 0030): the [cachyos-*-v3] packages and databases are signed with
+# it. Pinned here; wolos-trusted lists it fully trusted and wolos.gpg carries it (checks/image_mirror).
+882DCFE48E2051D48E2562ABF3B607488DB35A47:4:

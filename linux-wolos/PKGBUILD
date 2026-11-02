@@ -70,7 +70,8 @@ source=(
   prepare.sh
 )
 sha256sums=('5c0880774f3c928a4d9e344a8cb309069f5d049d7a60333f99a2f54450a023fd'
-  SKIP SKIP)
+            'f16adcb6dc1dc241ea90e23ca920697d00e4618df1b72d914ff15bc55ab4051f'
+            '685e97815293c21a07398f7771ec8575436ce73399aeddba6836d079a2433fca')
 
 export KBUILD_BUILD_HOST=wolos
 export KBUILD_BUILD_USER=$pkgbase

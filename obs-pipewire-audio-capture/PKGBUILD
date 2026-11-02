@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# obs-pipewire-audio-capture: OBS Studio sources "Application Audio Capture", "Desktop Audio
+# Capture" and "Audio Input Capture (PipeWire)", so a creator records one app or the "WolOS App
+# Mix" without PulseAudio monitors (docs/creators-audio.md). From the AUR recipe of the same name;
+# built from a pinned upstream commit (the 1.2.2 tag) instead of a release tarball so a moved tag
+# cannot change what we ship. Not on the image: OBS itself is an online install.
+pkgname=obs-pipewire-audio-capture
+pkgver=1.2.2
+pkgrel=1
+pkgdesc='PipeWire audio capture sources for OBS Studio (app, desktop, input)'
+arch=(x86_64)
+url='https://github.com/dimtpap/obs-pipewire-audio-capture'
+license=(GPL-2.0-or-later)
+depends=('obs-studio>=33' pipewire)
+optdepends=('pipewire-pulse: capture PulseAudio applications'
+  'pipewire-jack: capture JACK applications'
+  'pipewire-alsa: capture ALSA applications')
+makedepends=(cmake git simde)
+_commit=cc5a661e2f1037341cf92d6c990b6088876810b0 # tag 1.2.2 (2026-10-30)
+source=("$pkgname::git+$url.git#commit=$_commit")
+sha256sums=(SKIP)
+
+pkgver() {
+  cd "$pkgname"
+  git describe --tags --abbrev=0 | sed 's/^v//'
+}
+
+build() {
+  cmake -S "$pkgname" -B build \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  # OBS >= 33 layout: /usr/lib/obs-modules/plugins/linux-pipewire-audio.so and the locale under
+  # /usr/share/obs/obs-modules/plugins/linux-pipewire-audio (LEGACY=ON would give obs-plugins/).
+  install -Dm644 "$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

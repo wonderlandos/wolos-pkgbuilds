@@ -28,6 +28,10 @@ for p in $(grep -l '^_wolos_commit=' */PKGBUILD); do
     sed -i "s/^pkgrel=.*/pkgrel=$((rel + 1))/" "$p"
   fi
   sed -i "s/^_wolos_commit=.*/_wolos_commit=$sha/" "$p"
+  # Submodule sources pin the commits wolos records at SHA (audit A4: no unpinned git source).
+  gitlink() { git -C "$src" ls-tree "$sha" "$1" | awk '$2 == "commit" {print $3}'; }
+  if grep -q "^_brand_commit=" "$p"; then sed -i "s/^_brand_commit=.*/_brand_commit=$(gitlink design)/" "$p"; fi
+  if grep -q "^_shell_commit=" "$p"; then sed -i "s/^_shell_commit=.*/_shell_commit=$(gitlink crates/shell)/" "$p"; fi
   # wolos-base takes os-release as one checksummed file of that commit.
   if grep -q "^_os_release_sha256=" "$p"; then
     sed -i "s/^_os_release_sha256=.*/_os_release_sha256=$(show files/usr/share/wolos/os-release | sha256sum | cut -d" " -f1)/" "$p"

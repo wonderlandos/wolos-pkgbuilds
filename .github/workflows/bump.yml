@@ -30,7 +30,7 @@ jobs:
       - name: Token
         run: |
           [ -n "$GH_TOKEN" ] || { echo "::error::WOLOS_PKGBUILDS_TOKEN is not set: a bump pull request made with github.token gets no ci run"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           token: ${{ secrets.WOLOS_PKGBUILDS_TOKEN }}
       - name: Pin and open a pull request

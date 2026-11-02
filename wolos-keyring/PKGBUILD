@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# wolos-keyring: the keys pacman trusts for [wolos] and [wolos-cachy] (ADR 0019): the WolOS repo
-# signing key (wolos-keyring/wolos-repo.pub.asc) and the upstream x86-64-v3 package key pinned in
-# wolos-iso/release/cachy-trusted. The install script populates them into the system keyring.
+# wolos-keyring: the keys pacman trusts for [wolos] and the CachyOS x86-64-v3 repos (ADR 0030): the
+# WolOS repo signing key (wolos-repo.pub.asc) and the CachyOS package key pinned in cachy-trusted
+# (next to this file). The install script populates them into the system keyring.
 pkgname=wolos-keyring
 pkgver=2026.10.28
 pkgrel=1
@@ -11,7 +11,8 @@ url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 install=wolos-keyring.install
 source=(wolos.gpg wolos-trusted)
-sha256sums=(SKIP SKIP)
+sha256sums=('c9d980fb299101563485b05644584e55c75f85b28258d2449c9ce009c27e1101'
+            '55b36d95b7227e6ce2f3d6e447fa2f9e2e122396ff1febce4b3263fae43b6647')
 
 package() {
   install -Dm644 wolos.gpg "$pkgdir/usr/share/pacman/keyrings/wolos.gpg"

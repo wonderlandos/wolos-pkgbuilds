@@ -33,7 +33,7 @@ jobs:
       GH_REPO: ${{ vars.WOLOS_RELEASES_REPO || 'wonderlandos/wolos-packages' }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           path: wolos-pkgbuilds
@@ -53,13 +53,13 @@ jobs:
           fi
 
       - name: AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       # The tool: the builder image (.github/builder-image), not a checkout of the private repo.
       - name: Builder registry
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
 
       - name: Build on the cluster
         env:
@@ -79,7 +79,7 @@ jobs:
           git -C wolos-pkgbuilds rev-parse HEAD > out/built/built-from
           echo "built: $(cd out/built && ls ./*.pkg.tar.zst 2>/dev/null | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unsigned-packages
           path: |

@@ -15,9 +15,12 @@ makedepends=(cargo crystal git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
 _wolos_commit=1dcdea6e08525ce031d3b0587bdf850e2a0916c0
+# The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
+_brand_commit=743d616a733b8e91b86a10e735e41f180352dfb3
+_shell_commit=622a20a17321dfa9498237256a410b00b5f6f3b7
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
-  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git"
-  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git")
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
 sha256sums=(SKIP SKIP SKIP)
 
 prepare() {

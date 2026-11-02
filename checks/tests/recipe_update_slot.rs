@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+//! What this file checks (wolos-pkgbuilds): The update slot recipe: the slot update is `wol update apply`.
 //! The WolOS installer on Arch (ADR 0016, ADR 0013): `install-run <disk>` from the Install WolOS app
 //! (or `wolos.autoinstall=<disk>` on the kernel command line) erases only the picked disk, makes a
 //! GPT with an ESP and one btrfs partition, subvolumes `@wolos-a` `@home` `@var` (the first update
