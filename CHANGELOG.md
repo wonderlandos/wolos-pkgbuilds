@@ -7,7 +7,7 @@ tagged together (wolos ADR 0029).
 ## 0.12.0 (unreleased)
 
 Recipes
-- `linux-wolos` 1:1.0+7.3-5 (pkgrel 5) rebuilds the same fork tag `wolkernel-1.0-7.3` (sha256 unchanged); `linux-wolos-api-headers` stays at -4.
+- `linux-wolos` and `linux-wolos-api-headers` 1:1.0+7.3.1-1: WolKernel 1.0 on Linux 7.3.1 (stable, 24 CVE fixes). The fork series (branch `wolos-7.3.1`, tag `wolkernel-1.0-7.3.1`) is rebased from its former base, a 7.4 merge-window snapshot that was labelled 7.3.0, onto the released 7.3 line; options only 7.4 has (for example the steal governor) are gone. `tools/bump-kernel.sh wolkernel-1.0-7.3.1` fills the tarball checksum once the tag is on GitHub.
 - Optional modules as meta packages: `wolos-module-ai-claude`, `-ai-local`, `-ai-sessions`, `-console`, `-creative`, `-dev` and `-gaming` (depends only, `arch=any`). `wolos-module-ai-local` turns on its local AI service; `wolos-module-ai-claude` installs the WolOS managed settings for Claude Code, so they no longer ship with every system.
 - `wolos-hue`: the `wol-hue` theme tool, with its third-party notice.
 - `wolos-system` installs `THIRD-PARTY.md` under `/usr/share/licenses/wolos-system/` and keeps more of its `/etc` files on upgrade (`backup=`).

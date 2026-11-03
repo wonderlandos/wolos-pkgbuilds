@@ -29,12 +29,12 @@ export MAKEFLAGS=${MAKEFLAGS:--j$(nproc)}
 
 case $_march in generic|native) _suffix= ;; v3|v4) _suffix=-$_march ;; *) echo "_march: $_march?" >&2; exit 1 ;; esac
 pkgbase=linux-wolos$_suffix
-# Version: ./VERSION, shown as "WolKernel 1.1 (7.3)" (pkgver 1.1+7.3; epoch 1 sorts it above the old 7.3.0).
+# Version: ./VERSION, shown as "WolKernel 1.0 (7.3.1)" (pkgver 1.0+7.3.1; epoch 1 sorts it above the old 7.3.0).
 _wk=$(sed -n 's/^wolkernel=//p' "$startdir/VERSION")
 _linux=$(sed -n 's/^linux=//p' "$startdir/VERSION")
 epoch=1
 pkgver=$_wk+$_linux
-pkgrel=6
+pkgrel=1
 pkgdesc="WolKernel $_wk ($_linux)"
 url='https://github.com/wonderlandos/linux'
 arch=(x86_64)
@@ -69,13 +69,13 @@ source=(
   config.x86_64
   prepare.sh
 )
-sha256sums=('5c0880774f3c928a4d9e344a8cb309069f5d049d7a60333f99a2f54450a023fd'
+sha256sums=('ec44271922e9cb937bf6dfc4c9b3049170ce08b2a93651fda7f3e7a1483c3e6b'
             'f16adcb6dc1dc241ea90e23ca920697d00e4618df1b72d914ff15bc55ab4051f'
             '685e97815293c21a07398f7771ec8575436ce73399aeddba6836d079a2433fca')
 
 export KBUILD_BUILD_HOST=wolos
 export KBUILD_BUILD_USER=$pkgbase
-# uname -v: "#1 WolKernel 1.0 Linux 7.3 SMP PREEMPT_DYNAMIC <date>" (no parentheses: kbuild pastes it into a shell line).
+# uname -v: "#1 WolKernel 1.0 Linux 7.3.1 SMP PREEMPT_DYNAMIC <date>" (no parentheses: kbuild pastes it into a shell line).
 export KBUILD_BUILD_VERSION="$pkgrel WolKernel $_wk Linux $_linux"
 export KBUILD_BUILD_TIMESTAMP="$(date -Ru${SOURCE_DATE_EPOCH:+d @$SOURCE_DATE_EPOCH})"
 
