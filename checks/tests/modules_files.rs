@@ -792,7 +792,12 @@ fn bash_setup_runs_with_the_theme_colours_and_no_starship() {
     let home = d.join("home");
     let colors = home.join(".config/wolos/toolkits/bash/colors.sh");
     fs::create_dir_all(colors.parent().unwrap()).unwrap();
-    fs::write(&colors, "WOLOS_PROMPT_ACCENT_SGR='38;2;124;92;255'\n").unwrap();
+    // The shipped file is the generator's render of the default theme (core theme/console.rs
+    // `system_copy_is_the_default_render`), so its names are the ones `wol theme` writes; only the
+    // accent changes, to tell the user file from the shipped one.
+    let shipped = read("desktop/overlay/usr/share/wolos/toolkits/bash/colors.sh");
+    assert!(shipped.contains("WOLOS_ANSI_ACCENT='38;2;112;83;230'"), "{shipped}");
+    fs::write(&colors, shipped.replace("38;2;112;83;230", "38;2;124;92;255")).unwrap();
     let probe = format!(
         ". {}; _wolos_ps1; printf '%s\\n' \"H=$HISTSIZE\" \"P=$PS1\"",
         repo("desktop/overlay/usr/share/wolos/bash/bashrc").display()
@@ -877,4 +882,32 @@ fn zsh_fzf_pickers_bind_only_with_fzf_and_quote_what_they_insert() {
         out.contains("\"^[^F\" undefined-key"),
         "no fzf, no picker: {out}"
     );
+}
+
+/// SHELLS-check F2/F8: a command a shipped script calls without a guard comes with the image: the
+/// package that holds it is in wolos-system's `depends` or the ISO package lists. `arch-audit` was
+/// called by update-check and installed by nothing (the CVE list was always empty).
+#[test]
+fn commands_the_shipped_scripts_call_are_installed_by_the_image() {
+    let system = read("wolos-system/PKGBUILD");
+    let iso: String = ["packages.x86_64", "packages.desktop"]
+        .iter()
+        .map(|f| read(&format!("profile/{f}")))
+        .collect();
+    let word = |hay: &str, w: &str| {
+        hay.lines()
+            .filter(|l| !l.trim_start().starts_with('#'))
+            .any(|l| l.split(|c: char| c.is_whitespace() || c == '(' || c == ')').any(|t| t == w))
+    };
+    for (script, cmd, pkg) in [
+        ("files/usr/lib/wolos/update-check", "arch-audit", "arch-audit"),
+        ("files/usr/lib/wolos/update-check", "checkupdates", "pacman-contrib"),
+        ("files/usr/lib/wolos/verify-gpu.sh", "lspci", "pciutils"),
+    ] {
+        assert!(read(script).contains(cmd), "{script} no longer calls {cmd}");
+        assert!(
+            word(&system, pkg) || word(&iso, pkg),
+            "{script} calls {cmd}: {pkg} is in neither wolos-system depends nor the ISO lists"
+        );
+    }
 }

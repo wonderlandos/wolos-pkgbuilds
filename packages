@@ -13,6 +13,7 @@ helium-browser helium-browser       -                                       heli
 wolos-mirrorlist wolos-mirrorlist   -                                       wolos-mirrorlist/ snapshot
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
 wopkg          wopkg                -                                       wopkg/
+libwol         libwol               -                                       libwol/
 wolos-hue      wolos-hue            -                                       wolos-hue/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/
