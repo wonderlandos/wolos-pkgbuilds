@@ -84,7 +84,7 @@ index 20708d3..61fdfb7 100644
      // Upstream `--locked` alone leaves a locked screen with nothing that can unlock it.
      inline std::vector<std::string> crashLockArgs(const char* lockCmd) {
 diff --git a/src/managers/SessionLockManager.cpp b/src/managers/SessionLockManager.cpp
-index 67f4816..61f6728 100644
+index 01c5b12..fc293b7 100644
 --- a/src/managers/SessionLockManager.cpp
 +++ b/src/managers/SessionLockManager.cpp
 @@ -11,6 +11,7 @@
@@ -104,14 +104,14 @@ index 67f4816..61f6728 100644
 +    if (REPLACES) {
 +        const auto EXE = binaryNameForWlClient(pLock->client());
 +        if (WolosLock::refuseNewLock(true, EXE.has_value() && WolosLock::mayRestoreLock(*EXE))) {
-+            LOGM(Log::WARN, "Refusing a session lock takeover by {}: only {} may replace a lock", EXE.value_or("an unknown client"), WolosLock::RESTORE_LOCKER);
++            LOG(Log::WARN, "Refusing a session lock takeover by {}: only {} may replace a lock", EXE.value_or("an unknown client"), WolosLock::RESTORE_LOCKER);
 +            pLock->sendDenied();
 +            return;
 +        }
 +    }
 +
      if (PROTO::sessionLock->isLocked() && !*PALLOWRELOCK && g_pCompositor->m_startLockedCommand.empty()) {
-         LOGM(Log::DEBUG, "Cannot re-lock, misc:allow_session_lock_restore is disabled");
+         LOG(Log::DEBUG, "Cannot re-lock, misc:allow_session_lock_restore is disabled");
          pLock->sendDenied();
          return;
      }
@@ -120,12 +120,12 @@ index 67f4816..61f6728 100644
 +    if (WolosLock::newLockWaits(m_sessionLock && !clientDenied() && !clientLocked(), *PALLOWRELOCK))
          return; // Not allowing to relock in case the old lock is still in a limbo
  
-     LOGM(Log::DEBUG, "Session got locked by {:x}", (uintptr_t)pLock.get());
+     LOG(Log::DEBUG, "Session got locked by {:x}", (uintptr_t)pLock.get());
 diff --git a/src/protocols/SessionLock.cpp b/src/protocols/SessionLock.cpp
-index 1fbfd6c..95bdc16 100644
+index c8868d7..e343a01 100644
 --- a/src/protocols/SessionLock.cpp
 +++ b/src/protocols/SessionLock.cpp
-@@ -158,6 +158,10 @@ void CSessionLock::sendDenied() {
+@@ -166,6 +166,10 @@ void CSessionLock::sendDenied() {
      m_resource->sendFinished();
  }
  
@@ -155,7 +155,7 @@ index 8563413..1a6a823 100644
      struct {
          CSignalT<SP<CSessionLockSurface>> newLockSurface;
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 7aa99a6..bfd06a7 100644
+index e1822fb..72db377 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
 @@ -1,5 +1,6 @@
@@ -165,10 +165,10 @@ index 7aa99a6..bfd06a7 100644
  #include "../Compositor.hpp"
  #include "../helpers/math/Math.hpp"
  #include <algorithm>
-@@ -1717,8 +1718,9 @@ void IHyprRenderer::renderSessionLockPrimer(PHLMONITOR pMonitor) {
+@@ -1842,8 +1843,9 @@ void IHyprRenderer::renderSessionLockPrimer(CRenderContext& ctx, PHLMONITOR pMon
  }
  
- void IHyprRenderer::renderSessionLockMissing(PHLMONITOR pMonitor) {
+ void IHyprRenderer::renderSessionLockMissing(CRenderContext& ctx, PHLMONITOR pMonitor) {
 -    if (g_pCompositor->m_startLocked && !g_pCompositor->m_startLockedCommand.empty())
 -        return;
 +    static auto PALLOWRELOCK = CConfigValue<Config::INTEGER>("misc:allow_session_lock_restore");

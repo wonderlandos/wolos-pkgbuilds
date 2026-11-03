@@ -58,3 +58,23 @@ fn row_parser_reads_only_patch_rows() {
     let md = "| patch | area |\n|---|---|\n| 0001-a.patch | x |\n| 0002-b.patch | y |\nnot a row 0003-c.patch\n";
     assert_eq!(series_rows(md), ["0001-a.patch", "0002-b.patch"]);
 }
+
+/// The base SERIES.md names is the PKGBUILD's `pkgver` (a rebase onto a new tag changes both).
+#[test]
+fn series_names_the_pkgbuild_base() {
+    let pkgbuild =
+        std::fs::read_to_string(dir().join("PKGBUILD")).expect("hyprland-wolos/PKGBUILD");
+    let pkgver = pkgbuild
+        .lines()
+        .find_map(|l| l.strip_prefix("pkgver="))
+        .expect("pkgver=");
+    let md = std::fs::read_to_string(dir().join("SERIES.md")).expect("hyprland-wolos/SERIES.md");
+    let base = md
+        .lines()
+        .find(|l| l.starts_with("Base: "))
+        .expect("SERIES.md Base: line");
+    assert!(
+        base.contains(&format!("({pkgver};")) || base.contains(&format!("({pkgver})")),
+        "{base}"
+    );
+}

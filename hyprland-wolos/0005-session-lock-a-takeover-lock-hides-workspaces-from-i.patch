@@ -1,4 +1,4 @@
-From 25acbc2602c35f4b95c39f0e494d0897d954b444 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 01:51:52 -0300
 Subject: [PATCH] session-lock: a takeover lock hides workspaces from its first
@@ -14,18 +14,18 @@ set, instead of --locked with nothing that can unlock the session.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  src/helpers/WolosLock.hpp           | 35 +++++++++++++++++++++++++++++
- src/managers/SessionLockManager.cpp | 15 +++++++++++--
+ src/managers/SessionLockManager.cpp | 11 +++++++++
  src/managers/SessionLockManager.hpp |  2 ++
  src/render/Renderer.cpp             |  4 ++--
  start/src/core/Instance.cpp         |  5 ++++-
  tests/helpers/WolosLock.cpp         | 32 ++++++++++++++++++++++++++
- 6 files changed, 88 insertions(+), 5 deletions(-)
+ 6 files changed, 86 insertions(+), 3 deletions(-)
  create mode 100644 src/helpers/WolosLock.hpp
  create mode 100644 tests/helpers/WolosLock.cpp
 
 diff --git a/src/helpers/WolosLock.hpp b/src/helpers/WolosLock.hpp
 new file mode 100644
-index 0000000..69e5a2f
+index 0000000..20708d3
 --- /dev/null
 +++ b/src/helpers/WolosLock.hpp
 @@ -0,0 +1,35 @@
@@ -65,7 +65,7 @@ index 0000000..69e5a2f
 +    }
 +}
 diff --git a/src/managers/SessionLockManager.cpp b/src/managers/SessionLockManager.cpp
-index bb3e792..67f4816 100644
+index 960127b..01c5b12 100644
 --- a/src/managers/SessionLockManager.cpp
 +++ b/src/managers/SessionLockManager.cpp
 @@ -10,6 +10,7 @@
@@ -76,14 +76,10 @@ index bb3e792..67f4816 100644
  #include <algorithm>
  #include <ranges>
  
-@@ -63,8 +64,9 @@ void CSessionLockManager::onNewSessionLock(SP<CSessionLock> pLock) {
+@@ -65,6 +66,7 @@ void CSessionLockManager::onNewSessionLock(SP<CSessionLock> pLock) {
  
-     LOGM(Log::DEBUG, "Session got locked by {:x}", (uintptr_t)pLock.get());
- 
--    m_sessionLock       = makeUnique<SSessionLock>();
--    m_sessionLock->lock = pLock;
-+    m_sessionLock           = makeUnique<SSessionLock>();
-+    m_sessionLock->lock     = pLock;
+     m_sessionLock       = makeUnique<SSessionLock>();
+     m_sessionLock->lock = pLock;
 +    m_sessionLock->takeover = WolosLock::isTakeover(PROTO::sessionLock->isLocked());
      m_sessionLock->lockTimer.reset();
  
@@ -122,10 +118,10 @@ index cd312d5..1251188 100644
      struct {
          CSignalT<> lock;
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 8f40ca1..06a1b6f 100644
+index d6d8f46..d0a267e 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -1111,7 +1111,7 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+@@ -1216,7 +1216,7 @@ void IHyprRenderer::renderAllClientsForWorkspace(CRenderContext& ctx, PHLMONITOR
      if UNLIKELY (g_pSessionLockManager->isSessionLocked() && !*PSESSIONLOCKXRAY) {
          // We stop to render workspaces as soon as the lockscreen was sent the "locked" or "finished" (aka denied) event.
          // In addition we make sure to stop rendering workspaces after misc:lockdead_screen_delay has passed.
@@ -134,17 +130,17 @@ index 8f40ca1..06a1b6f 100644
              return;
      }
  
-@@ -1672,7 +1672,7 @@ void IHyprRenderer::renderLockscreen(PHLMONITOR pMonitor, const Time::steady_tp&
+@@ -1792,7 +1792,7 @@ void IHyprRenderer::renderLockscreen(CRenderContext& ctx, PHLMONITOR pMonitor, c
          return;
      }
  
 -    const bool RENDERPRIMER = g_pSessionLockManager->shallConsiderLockMissing() || g_pSessionLockManager->clientLocked() || g_pSessionLockManager->clientDenied();
 +    const bool RENDERPRIMER = g_pSessionLockManager->workspacesHidden();
      if (RENDERPRIMER)
-         renderSessionLockPrimer(pMonitor);
+         renderSessionLockPrimer(ctx, pMonitor);
  
 diff --git a/start/src/core/Instance.cpp b/start/src/core/Instance.cpp
-index 77661dc..0f3c87c 100644
+index 5ee7bb5..399ae1d 100644
 --- a/start/src/core/Instance.cpp
 +++ b/start/src/core/Instance.cpp
 @@ -2,6 +2,7 @@
@@ -164,7 +160,7 @@ index 77661dc..0f3c87c 100644
  #include <ranges>
  #include <string_view>
  
-@@ -33,7 +36,7 @@ void CHyprlandInstance::runHyprlandThread(bool safeMode, bool lockedCrash) {
+@@ -35,7 +38,7 @@ void CHyprlandInstance::runHyprlandThread(bool safeMode, bool lockedCrash) {
          argsStd.emplace_back("--safe-mode");
  
      if (lockedCrash)
@@ -211,6 +207,3 @@ index 0000000..e4cb1b1
 +    EXPECT_EQ(crashLockArgs(""), (V{"--locked"})); // upstream: locked, nothing to unlock with
 +    EXPECT_EQ(crashLockArgs(nullptr), (V{"--locked"}));
 +}
--- 
-2.54.0
-

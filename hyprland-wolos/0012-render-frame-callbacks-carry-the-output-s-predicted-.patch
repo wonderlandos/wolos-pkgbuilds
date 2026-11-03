@@ -11,12 +11,12 @@ back (WolosPerf::monotonicFloor, gtest).
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  src/helpers/WolosPerf.hpp            | 37 ++++++++++++++++++++++++++++
- src/output/Monitor.cpp               |  1 +
+ src/output/Monitor.cpp               |  3 +++
  src/output/Monitor.hpp               |  1 +
  src/output/MonitorFrameScheduler.cpp |  4 ++-
  src/render/Renderer.cpp              |  8 +++++-
  tests/helpers/WolosPerf.cpp          | 30 ++++++++++++++++++++++
- 6 files changed, 79 insertions(+), 2 deletions(-)
+ 6 files changed, 81 insertions(+), 2 deletions(-)
 
 diff --git a/src/helpers/WolosPerf.hpp b/src/helpers/WolosPerf.hpp
 index 25f20f2..390018d 100644
@@ -72,22 +72,24 @@ index 25f20f2..390018d 100644
 +    }
  }
 diff --git a/src/output/Monitor.cpp b/src/output/Monitor.cpp
-index 4b0f45c..5047332 100644
+index aff1444..4b4ef76 100644
 --- a/src/output/Monitor.cpp
 +++ b/src/output/Monitor.cpp
-@@ -161,6 +161,7 @@ void CMonitor::onConnect(bool noRule) {
+@@ -163,6 +163,9 @@ void CMonitor::onConnect(bool noRule) {
+             return;
          }
  
-         PROTO::presentation->onPresented(m_self.lock(), ts, event.refresh, event.seq, flags);
++        // WolOS: real presents feed the next-present prediction that frame callbacks carry.
 +        m_wolosPresent.onPresented(ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6, event.refresh / 1e6);
- 
-         if (m_zoomAnimFrameCounter < 5) {
-             m_zoomAnimFrameCounter++;
++
+         if (m_pendingDpmsAnimation) {
+             m_pendingDpmsAnimationCounter++;
+             // we give ourselves 5 frames of a buffer. The first presentation event still doesn't usually say that we actually
 diff --git a/src/output/Monitor.hpp b/src/output/Monitor.hpp
-index a376d8c..54b8dbc 100644
+index 0cad871..e052859 100644
 --- a/src/output/Monitor.hpp
 +++ b/src/output/Monitor.hpp
-@@ -119,6 +119,7 @@ namespace Monitor {
+@@ -120,6 +120,7 @@ namespace Monitor {
          SP<CEventLoopTimer>         m_dpmsRetryTimer;
  
          WolosPerf::SReconfigureBarrier m_wolosReconfigure;
@@ -96,10 +98,10 @@ index a376d8c..54b8dbc 100644
          bool                        m_pendingFrame    = false; // if we schedule a frame during rendering, reschedule it after
          bool                        m_renderingActive = false;
 diff --git a/src/output/MonitorFrameScheduler.cpp b/src/output/MonitorFrameScheduler.cpp
-index 9299bfb..b68de21 100644
+index 7c76e17..24fceec 100644
 --- a/src/output/MonitorFrameScheduler.cpp
 +++ b/src/output/MonitorFrameScheduler.cpp
-@@ -25,7 +25,9 @@ void CMonitorFrameScheduler::onSyncFired() {
+@@ -26,7 +26,9 @@ void CMonitorFrameScheduler::onSyncFired() {
      // Sync fired: reset submitted state, set as rendered. Check the last render time. If we are running
      // late, we will instantly render here.
  
@@ -108,13 +110,13 @@ index 9299bfb..b68de21 100644
 +
 +    if (!WolosPerf::renderMissedDeadline(std::chrono::duration_cast<std::chrono::microseconds>(hrc::now() - m_lastRenderBegun).count() / 1000.0, PMONITOR->m_refreshRate, *PDEADLINE)) {
          // we are in. Frame is valid. We can just render as normal.
-         Log::logger->log(Log::TRACE, "CMonitorFrameScheduler: {} -> onSyncFired, didn't miss.", PMONITOR->m_name);
+         LOG(Log::TRACE, "CMonitorFrameScheduler: {} -> onSyncFired, didn't miss.", PMONITOR->m_name);
          m_renderAtFrame = true;
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 5e0f885..7aa99a6 100644
+index 66838f0..e1822fb 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -2549,6 +2549,12 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
+@@ -2831,6 +2831,12 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
      const WolosPerf::SThrottleConfig CFG{
          .enabled = *PTHROTTLE, .windowCount = sc<int>(*PCOUNT), .cutoff = *PCUTOFF, .freezeMs = *PFREEZEMS, .freezeUpdates = sc<int>(*PFREEZEUPD)};
  
@@ -127,7 +129,7 @@ index 5e0f885..7aa99a6 100644
      const auto                       elapsedMs = std::chrono::duration<double, std::milli>(now - m_wolosLastFrameEvents).count();
      m_wolosLastFrameEvents                     = now;
  
-@@ -2609,7 +2615,7 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
+@@ -2895,7 +2901,7 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
          if (skipChildren)
              continue;
  

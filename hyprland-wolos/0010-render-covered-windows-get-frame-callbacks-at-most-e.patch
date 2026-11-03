@@ -19,16 +19,16 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  src/config/values/ConfigValues.cpp |  8 +++
  src/helpers/WolosPerf.hpp          | 85 ++++++++++++++++++++++++++++++
- src/render/Renderer.cpp            | 68 ++++++++++++++++++++++++
+ src/render/Renderer.cpp            | 75 ++++++++++++++++++++++++++
  src/render/Renderer.hpp            |  5 ++
  tests/helpers/WolosPerf.cpp        | 59 +++++++++++++++++++++
- 5 files changed, 225 insertions(+)
+ 5 files changed, 232 insertions(+)
 
 diff --git a/src/config/values/ConfigValues.cpp b/src/config/values/ConfigValues.cpp
-index 4954aeb..1679991 100644
+index b2a5f43..c39a909 100644
 --- a/src/config/values/ConfigValues.cpp
 +++ b/src/config/values/ConfigValues.cpp
-@@ -508,6 +508,14 @@ std::vector<SP<IValue>> Values::getConfigValues() {
+@@ -597,6 +597,14 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                  {.min = 1, .max = 3600}),
          MS<Bool>("misc:middle_click_paste", "whether to enable middle-click-paste (aka primary selection)", true),
          MS<Int>("misc:render_unfocused_fps", "the maximum limit for renderunfocused windows' fps in the background", 15, {.min = 1, .max = 120}),
@@ -145,10 +145,24 @@ index 520d6a9..32b89b2 100644
 +    }
  }
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 33a4992..3e2b08d 100644
+index d0a267e..305fea5 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -2514,12 +2514,80 @@ void IHyprRenderer::renderWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace
+@@ -88,6 +88,13 @@ using namespace Render;
+ 
+ extern "C" {
+ #include <xf86drm.h>
++
++// WolOS: a window that clients can see (0.56 IView::aliveAndVisible): mapped, not hidden, a mapped
++// surface and some alpha. Used by the covered-window throttle and the post-mode-change ack wait.
++static bool wolosShown(const PHLWINDOW& w) {
++    const auto RES = w ? w->resource() : nullptr;
++    return RES && RES->m_mapped && w->mapped() && !w->isHidden() && w->alphaNonZero();
++}
+ }
+ 
+ static int cursorTicker(void* data) {
+@@ -2787,6 +2794,29 @@ void IHyprRenderer::renderWorkspace(CRenderContext& ctx, PHLWORKSPACE workspace,
  }
  
  void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& now) {
@@ -167,7 +181,7 @@ index 33a4992..3e2b08d 100644
 +    // Windows in stacking order, bottom first: whatever comes after a window can cover it.
 +    std::vector<PHLWINDOW> mapped;
 +    for (const auto& w : Desktop::windowState()->windows())
-+        if (w->aliveAndVisible() && w->m_monitor == pMonitor)
++        if (wolosShown(w) && w->m_monitor == pMonitor)
 +            mapped.emplace_back(w);
 +    const int  COUNT = sc<int>(mapped.size());
 +    const auto FS    = CFG.enabled && COUNT > CFG.windowCount ? Fullscreen::controller()->getFullscreenWindow(pWorkspace, true) : nullptr;
@@ -176,7 +190,10 @@ index 33a4992..3e2b08d 100644
 +    bool                                                       skipChildren = false;
 +
      for (const auto& view : Desktop::View::getViewsForWorkspace(pWorkspace)) {
-         if (!view->aliveAndVisible())
+         if (!view->mapped() || !view->acceptsInput() || !view->resource())
+             continue;
+@@ -2795,8 +2825,53 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
+         if (alphaModifier && !alphaModifier->alphaNonZero())
              continue;
  
 +        if (view->type() == Desktop::View::VIEW_TYPE_WINDOW) {
@@ -199,12 +216,12 @@ index 33a4992..3e2b08d 100644
 +                        if (!after || o->m_workspace != pWorkspace)
 +                            continue;
 +                        // Faded or translucent windows show what is below them.
-+                        if (o->alphaValue(Desktop::View::WINDOW_ALPHA_FADE) != 1.F || o->alphaValue(Desktop::View::WINDOW_ALPHA_ACTIVE) != 1.F)
++                        if (o->presentation().alphaValue(Desktop::View::WINDOW_ALPHA_FADE) != 1.F || o->presentation().alphaValue(Desktop::View::WINDOW_ALPHA_ACTIVE) != 1.F)
 +                            continue;
 +                        const auto OS = o->wlSurface() ? o->wlSurface()->resource() : nullptr;
 +                        const auto OE = OS ? OS->m_current.opaque.getExtents() : CBox{};
 +                        const auto OB = o->getWindowMainSurfaceBox();
-+                        const auto R  = WolosPerf::occluderRect(WolosPerf::SRect{OB.x, OB.y, OB.w, OB.h}, o->opaque(), WolosPerf::SRect{OE.x, OE.y, OE.w, OE.h});
++                        const auto R  = WolosPerf::occluderRect(WolosPerf::SRect{OB.x, OB.y, OB.w, OB.h}, o->presentation().opaque(), WolosPerf::SRect{OE.x, OE.y, OE.w, OE.h});
 +                        if (R.w > 0 && R.h > 0)
 +                            above.push_back(R);
 +                    }
@@ -230,19 +247,19 @@ index 33a4992..3e2b08d 100644
  
  void IHyprRenderer::setSurfaceScanoutMode(SP<CWLSurfaceResource> surface, PHLMONITOR monitor) {
 diff --git a/src/render/Renderer.hpp b/src/render/Renderer.hpp
-index fcb1ff1..de1a9d0 100644
+index cf62a74..acd9128 100644
 --- a/src/render/Renderer.hpp
 +++ b/src/render/Renderer.hpp
-@@ -21,6 +21,8 @@
- #include "./pass/TextureMatteElement.hpp"
+@@ -25,6 +25,8 @@
  #include "./pass/TransformedWindowPassElement.hpp"
  #include "types.hpp"
+ #include "Context.hpp"
 +#include "../helpers/WolosPerf.hpp"
 +#include <unordered_map>
  #include "../output/Monitor.hpp"
  #include "../desktop/state/Fadeout.hpp"
  #include "../desktop/view/LayerSurface.hpp"
-@@ -306,6 +308,9 @@ namespace Render {
+@@ -329,6 +331,9 @@ namespace Render {
          std::vector<SP<IRenderbuffer>> m_renderbuffers;
          std::vector<PHLWINDOWREF>      m_renderUnfocused;
          SP<CEventLoopTimer>            m_renderUnfocusedTimer;

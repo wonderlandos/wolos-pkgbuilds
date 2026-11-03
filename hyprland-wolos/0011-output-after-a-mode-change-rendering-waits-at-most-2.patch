@@ -1,20 +1,36 @@
-From 7302240cc625110d6bbf9995472c2b8e18d44c7e Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Fri, 30 Oct 2026 11:51:21 -0300
-Subject: [PATCH 11/12] output: after a mode change, rendering waits at most
- 250 ms for clients to ack their new size
+Subject: [PATCH] output: after a mode change, rendering waits at most 250 ms
+ for clients to ack their new size
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/helpers/WolosPerf.hpp   | 28 ++++++++++++++++++++++++++++
- src/output/Monitor.cpp      |  3 +++
- src/output/Monitor.hpp      |  3 +++
- src/render/Renderer.cpp     | 26 ++++++++++++++++++++++++++
- tests/helpers/WolosPerf.cpp | 16 ++++++++++++++++
- 5 files changed, 76 insertions(+)
+ src/desktop/view/window/WaylandBackend.hpp |  4 ++++
+ src/helpers/WolosPerf.hpp                  | 28 ++++++++++++++++++++++
+ src/output/Monitor.cpp                     |  3 +++
+ src/output/Monitor.hpp                     |  3 +++
+ src/render/Renderer.cpp                    | 28 ++++++++++++++++++++++
+ tests/helpers/WolosPerf.cpp                | 16 +++++++++++++
+ 6 files changed, 82 insertions(+)
 
+diff --git a/src/desktop/view/window/WaylandBackend.hpp b/src/desktop/view/window/WaylandBackend.hpp
+index ee0c966..1ce5717 100644
+--- a/src/desktop/view/window/WaylandBackend.hpp
++++ b/src/desktop/view/window/WaylandBackend.hpp
+@@ -42,6 +42,10 @@ namespace Desktop::View {
+         void                   restackToTop() override;
+         void                   close() override;
+         void                   ping() override;
++        // WolOS: configures the client has not acked yet (the post-mode-change wait).
++        bool                   awaitingConfigureAcks() const {
++            return !m_configureAcks.empty();
++        }
+ 
+       private:
+         void                       attach(PHLWINDOWREF window) override;
 diff --git a/src/helpers/WolosPerf.hpp b/src/helpers/WolosPerf.hpp
-index 0fe433b..7f96ad6 100644
+index 32b89b2..25f20f2 100644
 --- a/src/helpers/WolosPerf.hpp
 +++ b/src/helpers/WolosPerf.hpp
 @@ -7,6 +7,9 @@
@@ -27,7 +43,7 @@ index 0fe433b..7f96ad6 100644
      // Slow safety tick for the cursor-hiding check (was a fixed 2 Hz poll).
      inline constexpr int CURSOR_HEARTBEAT_MS = 5000;
  
-@@ -104,4 +107,29 @@ namespace WolosPerf {
+@@ -128,4 +131,29 @@ namespace WolosPerf {
          st.skipped++;
          return false;
      }
@@ -58,10 +74,10 @@ index 0fe433b..7f96ad6 100644
 +    };
  }
 diff --git a/src/output/Monitor.cpp b/src/output/Monitor.cpp
-index f060b5b..4b0f45c 100644
+index caf4209..aff1444 100644
 --- a/src/output/Monitor.cpp
 +++ b/src/output/Monitor.cpp
-@@ -1079,6 +1079,9 @@ bool CMonitor::applyMonitorRule(Config::CMonitorRule&& pMonitorRule) {
+@@ -1027,6 +1027,9 @@ bool CMonitor::applyMonitorRule(Config::CMonitorRule&& pMonitorRule) {
  
      m_events.modeChanged.emit();
  
@@ -72,7 +88,7 @@ index f060b5b..4b0f45c 100644
  }
  
 diff --git a/src/output/Monitor.hpp b/src/output/Monitor.hpp
-index 945fecd..a376d8c 100644
+index c37e48c..0cad871 100644
 --- a/src/output/Monitor.hpp
 +++ b/src/output/Monitor.hpp
 @@ -4,6 +4,7 @@
@@ -83,7 +99,7 @@ index 945fecd..a376d8c 100644
  #include "../helpers/MiscFunctions.hpp"
  #include "../helpers/WLClasses.hpp"
  #include <array>
-@@ -117,6 +118,8 @@ namespace Monitor {
+@@ -118,6 +119,8 @@ namespace Monitor {
  
          SP<CEventLoopTimer>         m_dpmsRetryTimer;
  
@@ -93,10 +109,18 @@ index 945fecd..a376d8c 100644
          bool                        m_renderingActive = false;
  
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 375e820..725b09f 100644
+index 305fea5..66838f0 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -2040,6 +2040,32 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
+@@ -88,6 +88,7 @@ using namespace Render;
+ 
+ extern "C" {
+ #include <xf86drm.h>
++#include "../desktop/view/window/WaylandBackend.hpp"
+ 
+ // WolOS: a window that clients can see (0.56 IView::aliveAndVisible): mapped, not hidden, a mapped
+ // surface and some alpha. Used by the covered-window throttle and the post-mode-change ack wait.
+@@ -2284,6 +2285,33 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
          return;
      }
  
@@ -105,7 +129,8 @@ index 375e820..725b09f 100644
 +        static auto PACKMS = CConfigValue<Config::INTEGER>("misc:reconfigure_ack_timeout_ms");
 +        int         pending = 0;
 +        for (const auto& w : Desktop::windowState()->windows())
-+            if (w->aliveAndVisible() && w->m_monitor == pMonitor && !w->m_isX11 && !w->m_pendingSizeAcks.empty())
++            if (wolosShown(w) && w->m_monitor == pMonitor && w->backend().type() == Desktop::View::eBackendType::WINDOW_BACKEND_WAYLAND &&
++                static_cast<const Desktop::View::CWaylandBackend&>(w->backend()).awaitingConfigureAcks())
 +                pending++;
 +        const double NOWMS = WolosPerf::nowMs();
 +        if (pMonitor->m_wolosReconfigure.hold(NOWMS, pending, *PACKMS)) {
@@ -130,10 +155,10 @@ index 375e820..725b09f 100644
          damageBlinkCleanup = 0;
  
 diff --git a/tests/helpers/WolosPerf.cpp b/tests/helpers/WolosPerf.cpp
-index 2d9b030..629881b 100644
+index 1e747d9..51880da 100644
 --- a/tests/helpers/WolosPerf.cpp
 +++ b/tests/helpers/WolosPerf.cpp
-@@ -84,3 +84,19 @@ TEST(WolosPerf, throttleNeedsManyWindowsAndLowVisibility) {
+@@ -109,3 +109,19 @@ TEST(WolosPerf, throttleNeedsManyWindowsAndLowVisibility) {
      c.enabled = false;
      EXPECT_TRUE(allowFrameCallback(st, 0.0, 20, 1.0, c));
  }
@@ -153,6 +178,3 @@ index 2d9b030..629881b 100644
 +    b.begin(4000);
 +    EXPECT_DOUBLE_EQ(b.remainingMs(4100, 250), 150.0);
 +}
--- 
-2.54.0
-
