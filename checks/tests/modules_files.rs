@@ -759,6 +759,52 @@ fn console_configs_are_wired_and_themed_from_the_toolkits() {
     assert!(
         ps.contains("wolos/toolkits/pwsh/colors.ps1") && ps.contains("-MaximumHistoryCount 50000")
     );
+    // pwsh: interactive only, the zsh prompt and suggestions, the wopkg completer; the recipe
+    // loads it ($PSHOME/profile.ps1), turns telemetry off and adds the launcher entry.
+    for want in [
+        "$env:WOLOS_PWSH_FORCE -ne '1'",
+        "[Console]::IsOutputRedirected",
+        "function global:prompt",
+        "-PredictionSource History",
+        "& $wolosInit wopkg @('completions', 'pwsh')",
+    ] {
+        assert!(ps.contains(want), "profile.ps1 lacks {want}");
+    }
+    assert_eq!(
+        ps.matches('{').count(),
+        ps.matches('}').count(),
+        "profile.ps1 braces"
+    );
+    let rc = read("wopkg/recipes/powershell/recipe.toml");
+    for want in [
+        "POWERSHELL_TELEMETRY_OPTOUT=1",
+        "POWERSHELL_UPDATECHECK=Off",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "$PREFIX/lib/powershell/profile.ps1",
+        "/usr/share/wolos/pwsh/profile.ps1",
+        "wolos-pwsh.desktop",
+        "sha256 = \"",
+    ] {
+        assert!(rc.contains(want), "recipe powershell lacks {want}");
+    }
+    // Terminals open the shell chosen in Settings > General (account shell stays zsh).
+    for (f, want) in [
+        (
+            "desktop/overlay/usr/share/wolos/foot/foot.ini",
+            "shell=/usr/bin/wol-term-shell",
+        ),
+        (
+            "desktop/overlay/usr/share/wolos/ghostty/config",
+            "command = /usr/bin/wol-term-shell",
+        ),
+        (
+            "desktop/overlay/usr/share/wolos/kitty/kitty.conf",
+            "shell /usr/bin/wol-term-shell",
+        ),
+    ] {
+        assert!(read(f).lines().any(|l| l == want), "{f} lacks {want}");
+    }
+    assert!(repo("desktop/overlay/usr/bin/wol-term-shell").is_file());
     let gh = read("desktop/overlay/usr/share/wolos/ghostty/config");
     assert!(gh.contains("config-file = ?~/.config/wolos/toolkits/ghostty/theme"));
     let zj = read("desktop/overlay/etc/zellij/config.kdl");
