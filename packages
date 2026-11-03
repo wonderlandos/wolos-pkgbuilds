@@ -31,3 +31,4 @@ wolos-module-console wolos-module-console -                          wolos-modul
 wolos-module-creative wolos-module-creative -                        wolos-module-creative/
 wolos-module-dev wolos-module-dev -                                  wolos-module-dev/
 wolos-module-gaming wolos-module-gaming -                            wolos-module-gaming/
+wolos-app-looks wolos-app-looks libwolkit,libwol,wolos-system wolos-app-looks/
