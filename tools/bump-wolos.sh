@@ -15,7 +15,7 @@ if [ -z "$src" ]; then
   git -C "$src" checkout -q FETCH_HEAD
 fi
 show() { git -C "$src" show "$sha:$1"; }
-ver_os=$(show CHANGELOG.md | awk '/^## [0-9]/ {print $2; exit}')
+ver_os=$(show CHANGELOG.md | awk '/^## [0-9]/ && !v {v=$2} END {print v}')
 ver_wopkg=$(show wopkg/shard.yml | sed -n 's/^version: //p')
 # libwol follows its ABI (WOL_VERSION_MAJOR.MINOR.PATCH), so apps can depend on libwol>=1.N.
 ver_libwol=$(show crates/wol-abi/include/wol.h | awk '/^#define WOL_VERSION_(MAJOR|MINOR|PATCH) / {v = v (v == "" ? "" : ".") $3} END {print v}')
