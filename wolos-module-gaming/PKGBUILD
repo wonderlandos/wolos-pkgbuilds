@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-gaming (ADR 0032, wolos docs/modules/modules.md): the "Gaming" optional module.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/gaming.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package; nothing outside Arch is a dependency. User side (`wol modules enable gaming`):
+# nothing: Steam and GameMode are in the base, this adds Wine, Lutris and MangoHud.
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-gaming
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Gaming module: Wine with Mono and Gecko, winetricks, Lutris and MangoHud'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system wine wine-mono wine-gecko winetricks lutris mangohud lib32-mangohud)
+
+package() {
+  # Nothing to install: the dependencies are the module.
+  :
+}

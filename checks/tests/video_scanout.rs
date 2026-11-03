@@ -7,11 +7,7 @@ mod siblings;
 
 use std::path::PathBuf;
 fn read(p: &str) -> String {
-    std::fs::read_to_string(
-        siblings::root()
-            .join(p),
-    )
-    .unwrap()
+    std::fs::read_to_string(siblings::root().join(p)).unwrap()
 }
 
 #[test]

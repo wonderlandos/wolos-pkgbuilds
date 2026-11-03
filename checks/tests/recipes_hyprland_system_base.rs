@@ -13,8 +13,7 @@ use std::{
     process::Command,
 };
 fn repo(p: &str) -> PathBuf {
-    siblings::root()
-        .join(p)
+    siblings::root().join(p)
 }
 
 fn read(p: &str) -> String {
@@ -41,11 +40,17 @@ fn hyprland_fork_and_system_package_recipes() {
         let name = e.unwrap().file_name().into_string().unwrap();
         if name.ends_with(".patch") {
             n += 1;
-            assert!(h.lines().any(|l| l.trim() == name), "hyprland-wolos source lacks {name}");
+            assert!(
+                h.lines().any(|l| l.trim() == name),
+                "hyprland-wolos source lacks {name}"
+            );
         }
     }
     assert!(n > 0, "no patches in {}", dir.display());
-    assert!(!h.contains("$startdir\"/.."), "hyprland-wolos reaches outside its directory");
+    assert!(
+        !h.contains("$startdir\"/.."),
+        "hyprland-wolos reaches outside its directory"
+    );
     let w = read("wolos-system/PKGBUILD");
     for want in [
         "pkgname=wolos-system",
@@ -54,6 +59,8 @@ fn hyprland_fork_and_system_package_recipes() {
         "files",
         "build-plugins.sh",
         "hyprland-wolos",
+        // The notices of the third-party code the shell carries travel with the package.
+        "install -Dm644 \"$_repo/docs/THIRD-PARTY.md\" \"$pkgdir/usr/share/licenses/$pkgname/THIRD-PARTY.md\"",
     ] {
         assert!(w.contains(want), "wolos-system lacks {want}");
     }
@@ -103,8 +110,14 @@ fn wolos_base_is_one_versioned_base() {
             .any(|l| l.starts_with("source=") && l.contains("../"))
     );
     // From the pinned wolos source, not a sibling checkout.
-    assert!(b.contains("files/usr/share/wolos/os-release\"") && b.contains("\"$srcdir/os-release-$_wolos_commit\""));
-    assert!(b.contains("_os_release_sha256="), "os-release has a checksum");
+    assert!(
+        b.contains("files/usr/share/wolos/os-release\"")
+            && b.contains("\"$srcdir/os-release-$_wolos_commit\"")
+    );
+    assert!(
+        b.contains("_os_release_sha256="),
+        "os-release has a checksum"
+    );
     let os = read("files/usr/share/wolos/os-release");
     assert!(os.contains("ID=wolos") && os.contains("ID_LIKE=arch"));
     assert!(

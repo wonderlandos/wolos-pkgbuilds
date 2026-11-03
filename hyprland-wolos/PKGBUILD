@@ -3,8 +3,8 @@
 # applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
-pkgrel=4
-pkgdesc='Hyprland compositor with the WolOS patches'
+pkgrel=5
+pkgdesc='The WolOS window compositor: a tuned fork with the WolOS patches'
 arch=(x86_64)
 url='https://github.com/hyprwm/Hyprland'
 license=(BSD-3-Clause)
@@ -36,8 +36,8 @@ source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.g
   0015-layout-a-dragged-window-never-goes-under-the-menu-bar.patch
 )
 sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
-            '71b3d7b3359a262d22b8bf392f8d3f5a06688b8c146d4fee520c99e97a74aab5'
-            '32e2b620cce8e9a152d458f29da6cf8e51889f8ea49501887ce5cb0cc7bb079e'
+            '4e92e598a624cee5c7ed6712ffaf6276e8502234a5c0c7f17ae88656e571b80b'
+            '5f577230db267da3c319a872733150b2012b67b7d82e428cd00aab7a0f90b001'
             '56c2a8795e914be4f8942b6d78e3f0268f5db33041854e35b99be24bf4fbc6ac'
             'a4a47d0fdcb089fec73edb92b92064c68d3a167ae22f2db97e068ea4824eb7c3'
             '343bebd9f055d9e3a64568424a1ef5bb89b9a7a99f7999a31e201b12cdc7be18'
@@ -45,12 +45,12 @@ sha256sums=('03ad3f5ef152ff44116ffd56fcf808486211ecabf4f0ba567108ee746ba5cd2e'
             '4df07bd660fa63af83279232ef1d814c0ef0b92c90894748e759584ac91a9764'
             'e45fc587a04c61beb15e30305334e61a0fbe406f98f61b2e0740a478115e6d19'
             '3b1a76f757b3c5371a7f1dfa79ac68bcd05d311165010b02aa11fb7ccbff311c'
-            'e140455c196783e5019e9eee87a37bfdfd522ca744a12a2184d205b283aea420'
+            '2b9e90118aab318523c2f8f59cd6dacac552c5c7573c1ac75e119dd5ef82fc0a'
             'f4f76be6e7e6b0c55e8036efe975b00e894a3a09a4b3dfd47a851021b83fcf09'
-            '83aa8bff924133f11cd32dc0f71e5517442a5b6b3824371d6fd90092cd8fe0bb'
+            'ff21874913883e4422677c5003357443c2720184c7b623c80313a50db5ab9e6a'
             '9d72a934c9f328a5e5d53da287fd06ea47d42a34249888df2e6d08968fd9db2e'
-            '9a4de22075f3208e6f4be3ec1fe006b75852fe0efe9bb36aef268fe4dba20017'
-            '75cccf2148c7ce2432d0a3f9315274cb51fee652078a57a87ec03ec375a432bf')
+            '4e4d8311f2dffbac44172d5f39f863ff1c13cb5d3958b82e9416cf3cc5cca221'
+            '3728315043588c694c9ff9b98123a2c910e5474fc17a1c3837e0f97655e36073')
 
 prepare() {
   ln -sf hyprland-source "$_archive"
@@ -65,11 +65,20 @@ prepare() {
 
 build() {
   cd "$_archive"
+  # ccache (wolos-build's ccache flag): upstream precompiles headers (CMake -include of the PCH), and
+  # ccache passes every call that uses a PCH through uncached (5.9 % cacheable). With this sloppiness
+  # it hashes them: pch_defines and time_macros skip checks for macros this build never varies, the
+  # include_file_* ones accept headers extracted just before the build.
+  export CCACHE_SLOPPINESS=${CCACHE_SLOPPINESS:-pch_defines,time_macros,include_file_mtime,include_file_ctime}
   # Upstream's `make release`, with the jobs makepkg was given (it runs one per core otherwise).
   cmake --no-warn-unused-cli -DCMAKE_SKIP_RPATH=ON -DCMAKE_BUILD_TYPE:STRING=Release \
     -DCMAKE_INSTALL_PREFIX:STRING=/usr -S . -B ./build
-  local j=${MAKEFLAGS##*-j}; j=${j%% *}
-  cmake --build ./build --config Release --target all -j"${j:-$(nproc)}"
+  local j
+  case " ${MAKEFLAGS:-} " in *' -j'[0-9]*) j=${MAKEFLAGS##*-j}; j=${j%% *} ;; *) j=$(nproc) ;; esac
+  cmake --build ./build --config Release --target all -j"$j"
+  # The cache's hit rate in the build log (BF-11: was 5.9 % cacheable).
+  # makepkg's BUILDENV ccache puts /usr/lib/ccache/bin first on PATH (cache_dir: /etc/ccache.conf).
+  case :$PATH: in *:/usr/lib/ccache/bin:*) ccache -s || true ;; esac
 }
 
 package() {

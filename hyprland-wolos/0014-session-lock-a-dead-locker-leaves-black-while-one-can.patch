@@ -1,4 +1,4 @@
-From e9a3127f7c7d26ec29859fbc7fcf4f469acbdb24 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Sun, 1 Nov 2026 14:00:00 -0300
 Subject: [PATCH] session-lock: a dead locker leaves black while one can
@@ -14,19 +14,37 @@ restore the lock still shows the page.
 A new lock while the previous one never confirmed was ignored and waited
 forever for locked or finished; with the option on it takes over.
 
+Only /usr/bin/wol-lock may replace a held or pending lock (restore after a
+crash, the --locked-cmd start, limbo). Upstream lets any same-user Wayland
+client take over a locked session with the option on, and the new owner may
+send unlock_and_destroy: a sandboxed app with the Wayland socket could unlock
+the screen. Any other client asking then gets finished. A first lock on an
+unlocked session is still anyone's. WolosLock::mayRestoreLock, refuseNewLock,
+gtest in tests/helpers/WolosLock.cpp.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/helpers/WolosLock.hpp           | 13 +++++++++++++
- src/managers/SessionLockManager.cpp |  2 +-
+ src/helpers/WolosLock.hpp           | 33 +++++++++++++++++++++++++++++
+ src/managers/SessionLockManager.cpp | 14 +++++++++++-
+ src/protocols/SessionLock.cpp       |  4 ++++
+ src/protocols/SessionLock.hpp       |  7 +++---
  src/render/Renderer.cpp             |  6 ++++--
- tests/helpers/WolosLock.cpp         | 14 ++++++++++++++
- 4 files changed, 32 insertions(+), 3 deletions(-)
+ tests/helpers/WolosLock.cpp         | 26 +++++++++++++++++++++++
+ 6 files changed, 84 insertions(+), 6 deletions(-)
 
 diff --git a/src/helpers/WolosLock.hpp b/src/helpers/WolosLock.hpp
-index 20708d3..d444d47 100644
+index 20708d3..61fdfb7 100644
 --- a/src/helpers/WolosLock.hpp
 +++ b/src/helpers/WolosLock.hpp
-@@ -25,6 +25,19 @@ namespace WolosLock {
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <string>
++#include <string_view>
+ #include <vector>
+ 
+ // WolOS session-lock policy (ADR 0012). Pure functions: tested in tests/helpers/WolosLock.cpp.
+@@ -25,6 +26,38 @@ namespace WolosLock {
          return sessionWasLocked;
      }
  
@@ -43,14 +61,58 @@ index 20708d3..d444d47 100644
 +        return previousInLimbo && !allowRestore;
 +    }
 +
++    // The only program that may take over a session that is already locked (or a lock in limbo): the WolOS
++    // supervisor and the lock screen it runs (ADR 0012). Any other same-user Wayland client, a sandboxed app
++    // included, could otherwise take the lock and send unlock_and_destroy.
++    inline constexpr std::string_view RESTORE_LOCKER = "/usr/bin/wol-lock";
++
++    // `exe` is the client's /proc/<pid>/exe ("... (deleted)" after the binary was updated in place).
++    inline bool mayRestoreLock(std::string_view exe) {
++        constexpr std::string_view DELETED = " (deleted)";
++        if (exe.ends_with(DELETED))
++            exe.remove_suffix(DELETED.size());
++        return exe == RESTORE_LOCKER;
++    }
++
++    // A new lock that would replace a held or pending one (crash restore, `--locked-cmd` start, limbo) is
++    // refused unless it comes from the restore locker. A first lock on an unlocked session is anyone's.
++    inline constexpr bool refuseNewLock(bool replacesALock, bool fromRestoreLocker) {
++        return replacesALock && !fromRestoreLocker;
++    }
++
      // start-hyprland after a crash: relaunch locked *with* the locker named in $WOLOS_CRASH_LOCK_CMD.
      // Upstream `--locked` alone leaves a locked screen with nothing that can unlock it.
      inline std::vector<std::string> crashLockArgs(const char* lockCmd) {
 diff --git a/src/managers/SessionLockManager.cpp b/src/managers/SessionLockManager.cpp
-index 67f4816..30211e9 100644
+index 67f4816..61f6728 100644
 --- a/src/managers/SessionLockManager.cpp
 +++ b/src/managers/SessionLockManager.cpp
-@@ -59,7 +59,7 @@ void CSessionLockManager::onNewSessionLock(SP<CSessionLock> pLock) {
+@@ -11,6 +11,7 @@
+ #include "../managers/eventLoop/EventLoopManager.hpp"
+ #include "../state/MonitorState.hpp"
+ #include "../helpers/WolosLock.hpp"
++#include "../helpers/MiscFunctions.hpp"
+ #include <algorithm>
+ #include <ranges>
+ 
+@@ -53,13 +54,24 @@ CSessionLockManager::CSessionLockManager() {
+ void CSessionLockManager::onNewSessionLock(SP<CSessionLock> pLock) {
+     static auto PALLOWRELOCK = CConfigValue<Config::INTEGER>("misc:allow_session_lock_restore");
+ 
++    // WolOS: replacing a held or pending lock is for the restore locker only (wol-lock, ADR 0012).
++    const bool REPLACES = PROTO::sessionLock->isLocked() || (m_sessionLock && !clientDenied() && !clientLocked());
++    if (REPLACES) {
++        const auto EXE = binaryNameForWlClient(pLock->client());
++        if (WolosLock::refuseNewLock(true, EXE.has_value() && WolosLock::mayRestoreLock(*EXE))) {
++            LOGM(Log::WARN, "Refusing a session lock takeover by {}: only {} may replace a lock", EXE.value_or("an unknown client"), WolosLock::RESTORE_LOCKER);
++            pLock->sendDenied();
++            return;
++        }
++    }
++
+     if (PROTO::sessionLock->isLocked() && !*PALLOWRELOCK && g_pCompositor->m_startLockedCommand.empty()) {
+         LOGM(Log::DEBUG, "Cannot re-lock, misc:allow_session_lock_restore is disabled");
+         pLock->sendDenied();
          return;
      }
  
@@ -59,8 +121,41 @@ index 67f4816..30211e9 100644
          return; // Not allowing to relock in case the old lock is still in a limbo
  
      LOGM(Log::DEBUG, "Session got locked by {:x}", (uintptr_t)pLock.get());
+diff --git a/src/protocols/SessionLock.cpp b/src/protocols/SessionLock.cpp
+index 1fbfd6c..95bdc16 100644
+--- a/src/protocols/SessionLock.cpp
++++ b/src/protocols/SessionLock.cpp
+@@ -158,6 +158,10 @@ void CSessionLock::sendDenied() {
+     m_resource->sendFinished();
+ }
+ 
++wl_client* CSessionLock::client() {
++    return m_resource ? m_resource->client() : nullptr;
++}
++
+ CSessionLockProtocol::CSessionLockProtocol(const wl_interface* iface, const int& ver, const std::string& name) : IWaylandProtocol(iface, ver, name) {
+     ;
+ }
+diff --git a/src/protocols/SessionLock.hpp b/src/protocols/SessionLock.hpp
+index 8563413..1a6a823 100644
+--- a/src/protocols/SessionLock.hpp
++++ b/src/protocols/SessionLock.hpp
+@@ -48,9 +48,10 @@ class CSessionLock {
+     CSessionLock(SP<CExtSessionLockV1> resource_);
+     ~CSessionLock();
+ 
+-    bool good();
+-    void sendLocked();
+-    void sendDenied();
++    bool       good();
++    void       sendLocked();
++    void       sendDenied();
++    wl_client* client(); // WolOS: who asks for the lock (restore takeover check)
+ 
+     struct {
+         CSignalT<SP<CSessionLockSurface>> newLockSurface;
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 304d120..4f45f18 100644
+index 7aa99a6..bfd06a7 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
 @@ -1,5 +1,6 @@
@@ -70,7 +165,7 @@ index 304d120..4f45f18 100644
  #include "../Compositor.hpp"
  #include "../helpers/math/Math.hpp"
  #include <algorithm>
-@@ -1714,8 +1715,9 @@ void IHyprRenderer::renderSessionLockPrimer(PHLMONITOR pMonitor) {
+@@ -1717,8 +1718,9 @@ void IHyprRenderer::renderSessionLockPrimer(PHLMONITOR pMonitor) {
  }
  
  void IHyprRenderer::renderSessionLockMissing(PHLMONITOR pMonitor) {
@@ -83,10 +178,10 @@ index 304d120..4f45f18 100644
      const bool ANY_PRESENT = g_pSessionLockManager->anySessionLockSurfacesPresent();
  
 diff --git a/tests/helpers/WolosLock.cpp b/tests/helpers/WolosLock.cpp
-index e4cb1b1..c53d655 100644
+index e4cb1b1..b585ace 100644
 --- a/tests/helpers/WolosLock.cpp
 +++ b/tests/helpers/WolosLock.cpp
-@@ -24,6 +24,20 @@ TEST(WolosLock, takeoverOnlyWhenAlreadyLocked) {
+@@ -24,6 +24,32 @@ TEST(WolosLock, takeoverOnlyWhenAlreadyLocked) {
      EXPECT_FALSE(isTakeover(false));
  }
  
@@ -104,9 +199,18 @@ index e4cb1b1..c53d655 100644
 +    EXPECT_FALSE(newLockWaits(false, true));
 +}
 +
++TEST(WolosLock, onlyWolLockTakesOverALockedSession) {
++    EXPECT_TRUE(mayRestoreLock("/usr/bin/wol-lock"));
++    EXPECT_TRUE(mayRestoreLock("/usr/bin/wol-lock (deleted)")); // updated in place while running
++    EXPECT_FALSE(mayRestoreLock("/usr/bin/hyprlock"));
++    EXPECT_FALSE(mayRestoreLock("/home/u/.local/bin/wol-lock")); // same name elsewhere
++    EXPECT_FALSE(mayRestoreLock("/usr/bin/wol-lockx"));
++    EXPECT_FALSE(mayRestoreLock(""));
++    EXPECT_TRUE(refuseNewLock(true, false));   // a sandboxed app trying to replace the lock
++    EXPECT_FALSE(refuseNewLock(true, true));   // wol-lock restoring a crashed lock screen
++    EXPECT_FALSE(refuseNewLock(false, false)); // first lock on an unlocked session: anyone
++}
++
  TEST(WolosLock, crashRestartRelaunchesTheLocker) {
      using V = std::vector<std::string>;
      EXPECT_EQ(crashLockArgs("wol-lock --startup"), (V{"--locked-cmd", "wol-lock --startup"}));
--- 
-2.56.0
-

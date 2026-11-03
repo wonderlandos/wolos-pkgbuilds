@@ -13,7 +13,17 @@ helium-browser helium-browser       -                                       heli
 wolos-mirrorlist wolos-mirrorlist   -                                       wolos-mirrorlist/ snapshot
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
 wopkg          wopkg                -                                       wopkg/
+wolos-hue      wolos-hue            -                                       wolos-hue/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/
 obs-pipewire-audio-capture obs-pipewire-audio-capture -                 obs-pipewire-audio-capture/
 wolos-base     wolos-base           linux-wolos,linux-wolos-api-headers,hyprland-wolos,wolos-system  wolos-base/ snapshot pacman.conf
+# Optional modules (ADR 0032): meta packages, depends only; not in the image (wolos-iso), installed by
+# install-run, firstboot or `wol modules install`.
+wolos-module-ai-claude wolos-module-ai-claude -                      wolos-module-ai-claude/
+wolos-module-ai-local wolos-module-ai-local -                        wolos-module-ai-local/
+wolos-module-ai-sessions wolos-module-ai-sessions -                  wolos-module-ai-sessions/
+wolos-module-console wolos-module-console -                          wolos-module-console/
+wolos-module-creative wolos-module-creative -                        wolos-module-creative/
+wolos-module-dev wolos-module-dev -                                  wolos-module-dev/
+wolos-module-gaming wolos-module-gaming -                            wolos-module-gaming/

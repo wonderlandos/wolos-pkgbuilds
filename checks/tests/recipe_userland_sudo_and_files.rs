@@ -9,8 +9,7 @@ mod siblings;
 
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, path::PathBuf, process::Command};
 fn repo(p: &str) -> PathBuf {
-    siblings::root()
-        .join(p)
+    siblings::root().join(p)
 }
 
 fn read(p: &str) -> String {
@@ -28,8 +27,7 @@ fn administrators_can_sudo() {
         .collect();
     assert_eq!(rules, ["%wheel ALL=(ALL:ALL) ALL"]);
     assert!(
-        read("wolos-system/PKGBUILD")
-            .contains(r#"chmod 440 "$pkgdir/etc/sudoers.d/wolos""#),
+        read("wolos-system/PKGBUILD").contains(r#"chmod 440 "$pkgdir/etc/sudoers.d/wolos""#),
         "sudoers drop-in must be 0440"
     );
     // sudo-rs reads /etc/sudoers, ours (sudo_works_on_every_system).

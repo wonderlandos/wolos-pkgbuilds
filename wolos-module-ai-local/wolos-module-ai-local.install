@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# shellcheck shell=bash
+# wolos-module-ai-local: Ollama answers as soon as the module is in (Arch's ollama.service, user
+# ollama, models in /var/lib/ollama, listening on 127.0.0.1 only). In the installer's chroot there is
+# no running systemd: the unit is only enabled and starts on the first boot.
+post_install() {
+  systemctl enable ollama.service >/dev/null 2>&1 || echo "wolos-module-ai-local: could not enable ollama.service"
+  if [ -d /run/systemd/system ]; then
+    systemctl start ollama.service || echo "wolos-module-ai-local: ollama.service did not start; it starts at the next boot"
+  fi
+}
+
+pre_remove() {
+  systemctl disable --now ollama.service >/dev/null 2>&1 || :  # already gone or never enabled: nothing to undo
+}

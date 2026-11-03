@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-hue: wol-hue, a WolOS theme from a picture or a Base16 / colors.toml palette (ADR 0031,
+# wolos docs/modules/hue.md). Crystal, built from github.com/wonderlandos/wolos (hue/), no shards;
+# the parts translated from MIT code carry their notice, installed as THIRD-PARTY.md.
+pkgname=wolos-hue
+pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS theme from a picture: palette engine, sliders, Base16 and colors.toml import'
+arch=(x86_64)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later MIT)
+depends=(gc pcre2 libyaml openssl gcc-libs glibc glib2 gdk-pixbuf2)
+optdepends=('webp-pixbuf-loader: WebP pictures' 'libavif: AVIF pictures' 'wolos-system: wol theme set, to switch to the new theme')
+makedepends=(crystal git)
+options=(!debug !lto)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
+_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+build() {
+  cd "$srcdir/wolos/hue"
+  crystal build --release --no-debug src/hue.cr -o "$srcdir/wol-hue"
+}
+
+check() {
+  cd "$srcdir/wolos/hue"
+  WOL_HUE_BIN=$srcdir/wol-hue crystal spec
+}
+
+package() {
+  local _repo=$srcdir/wolos
+  install -Dm755 "$srcdir/wol-hue" "$pkgdir/usr/bin/wol-hue"
+  install -Dm644 "$_repo/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$_repo/docs/THIRD-PARTY.md" "$pkgdir/usr/share/licenses/$pkgname/THIRD-PARTY.md"
+}

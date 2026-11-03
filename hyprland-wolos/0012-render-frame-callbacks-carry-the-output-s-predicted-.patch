@@ -1,21 +1,25 @@
-From fdae84b66b8a731a657867b155d8fde0d6edc5fa Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Fri, 30 Oct 2026 11:51:27 -0300
-Subject: [PATCH 12/12] render: frame callbacks carry the output's predicted
- next present time; late-render deadline is misc:frame_deadline of the frame
+Subject: [PATCH] render: frame callbacks carry the output's predicted next
+ present time; late-render deadline is misc:frame_deadline of the frame
+
+One floor across outputs keeps the frame clock monotonic for every surface: a
+window moved from a 144 Hz to a 60 Hz output never sees its frame time go
+back (WolosPerf::monotonicFloor, gtest).
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/helpers/WolosPerf.hpp            | 30 ++++++++++++++++++++++++++++
+ src/helpers/WolosPerf.hpp            | 37 ++++++++++++++++++++++++++++
  src/output/Monitor.cpp               |  1 +
  src/output/Monitor.hpp               |  1 +
- src/output/MonitorFrameScheduler.cpp |  4 +++-
- src/render/Renderer.cpp              |  6 +++++-
- tests/helpers/WolosPerf.cpp          | 17 ++++++++++++++++
- 6 files changed, 57 insertions(+), 2 deletions(-)
+ src/output/MonitorFrameScheduler.cpp |  4 ++-
+ src/render/Renderer.cpp              |  8 +++++-
+ tests/helpers/WolosPerf.cpp          | 30 ++++++++++++++++++++++
+ 6 files changed, 79 insertions(+), 2 deletions(-)
 
 diff --git a/src/helpers/WolosPerf.hpp b/src/helpers/WolosPerf.hpp
-index 7f96ad6..5b3c20f 100644
+index 25f20f2..390018d 100644
 --- a/src/helpers/WolosPerf.hpp
 +++ b/src/helpers/WolosPerf.hpp
 @@ -4,6 +4,7 @@
@@ -26,7 +30,7 @@ index 7f96ad6..5b3c20f 100644
  #include <vector>
  
  namespace WolosPerf {
-@@ -132,4 +133,33 @@ namespace WolosPerf {
+@@ -156,4 +157,40 @@ namespace WolosPerf {
              return std::max(1.0, timeoutMs - (nowMs - startMs));
          }
      };
@@ -54,6 +58,13 @@ index 7f96ad6..5b3c20f 100644
 +            return t;
 +        }
 +    };
++
++    // Predictions are per output; a surface moved from a 144 Hz to a 60 Hz output could see its frame clock go back.
++    // One floor for every output keeps frame times monotonic for every surface.
++    inline double monotonicFloor(double& floorMs, double predictedMs) {
++        floorMs = std::max(floorMs, predictedMs);
++        return floorMs;
++    }
 +
 +    // A render that has taken longer than this share of the frame interval counts as late.
 +    inline bool renderMissedDeadline(double renderedMs, float refreshHz, double deadline) {
@@ -100,21 +111,23 @@ index 9299bfb..b68de21 100644
          Log::logger->log(Log::TRACE, "CMonitorFrameScheduler: {} -> onSyncFired, didn't miss.", PMONITOR->m_name);
          m_renderAtFrame = true;
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 725b09f..304d120 100644
+index 5e0f885..7aa99a6 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -2546,6 +2546,10 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
+@@ -2549,6 +2549,12 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
      const WolosPerf::SThrottleConfig CFG{
          .enabled = *PTHROTTLE, .windowCount = sc<int>(*PCOUNT), .cutoff = *PCUTOFF, .freezeMs = *PFREEZEMS, .freezeUpdates = sc<int>(*PFREEZEUPD)};
  
 +    // Callbacks carry the output's predicted next present time (from presentation feedback), not "now".
-+    const auto PREDICTEDMS = pMonitor->m_wolosPresent.next(WolosPerf::nowMs());
++    // One floor across outputs: a window moved to a slower output never sees the clock go back.
++    static double s_wolosFrameFloorMs = 0;
++    const auto    PREDICTEDMS         = WolosPerf::monotonicFloor(s_wolosFrameFloorMs, pMonitor->m_wolosPresent.next(WolosPerf::nowMs()));
 +    const auto predicted   = now + std::chrono::duration_cast<Time::steady_dur>(std::chrono::duration<double, std::milli>(PREDICTEDMS - WolosPerf::nowMs()));
 +
      const auto                       elapsedMs = std::chrono::duration<double, std::milli>(now - m_wolosLastFrameEvents).count();
      m_wolosLastFrameEvents                     = now;
  
-@@ -2599,7 +2603,7 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
+@@ -2609,7 +2615,7 @@ void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE
          if (skipChildren)
              continue;
  
@@ -124,10 +137,10 @@ index 725b09f..304d120 100644
  
      if (!seen.empty())
 diff --git a/tests/helpers/WolosPerf.cpp b/tests/helpers/WolosPerf.cpp
-index 629881b..930d3e4 100644
+index 51880da..a938d0f 100644
 --- a/tests/helpers/WolosPerf.cpp
 +++ b/tests/helpers/WolosPerf.cpp
-@@ -100,3 +100,20 @@ TEST(WolosPerf, reconfigureWaitsForAcksButNeverPast250ms) {
+@@ -125,3 +125,33 @@ TEST(WolosPerf, reconfigureWaitsForAcksButNeverPast250ms) {
      b.begin(4000);
      EXPECT_DOUBLE_EQ(b.remainingMs(4100, 250), 150.0);
  }
@@ -143,11 +156,21 @@ index 629881b..930d3e4 100644
 +    EXPECT_DOUBLE_EQ(p.next(1049.0), 1056.0);
 +}
 +
++TEST(WolosPerf, frameTimesNeverGoBackAcrossOutputs) {
++    SPresentPredictor fast, slow;
++    fast.onPresented(1000.0, 6.944); // 144 Hz
++    slow.onPresented(1000.0, 16.667); // 60 Hz
++    double floor = 0;
++    const double a = monotonicFloor(floor, fast.next(1010.0)); // 1013.9 on the fast output
++    const double b = monotonicFloor(floor, slow.next(1010.0)); // 1016.7 on the slow one
++    EXPECT_NEAR(a, 1013.888, 1e-3);
++    EXPECT_NEAR(b, 1016.667, 1e-3);
++    // window moved back to the fast output: its prediction (1013.9) is below what it already saw
++    EXPECT_DOUBLE_EQ(monotonicFloor(floor, fast.next(1011.0)), b);
++}
++
 +TEST(WolosPerf, renderDeadlineIs95PercentOfTheFrame) {
 +    EXPECT_FALSE(renderMissedDeadline(15.0, 60.F, 0.95)); // 15.83 ms budget
 +    EXPECT_TRUE(renderMissedDeadline(15.9, 60.F, 0.95));
 +    EXPECT_FALSE(renderMissedDeadline(100.0, 0.F, 0.95)); // unknown refresh: never late
 +}
--- 
-2.54.0
-
