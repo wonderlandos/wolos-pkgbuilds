@@ -11,7 +11,7 @@
 # with, and wolos-system's /etc/sudoers clashes with the chroot's sudo.
 pkgname=wolos-base
 pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS base system: kernel, headers and userland of one release'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -25,7 +25,7 @@ backup=()
 install=wolos-base.install
 # os-release comes from the WolOS source (files/usr/share/wolos/os-release) at one commit, as one
 # file with its checksum (bump-wolos.sh moves both): no git, which --nodeps would not install.
-_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
+_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
 _os_release_sha256=1345cbb2d23dbb57949c6751baca359cf256b1e207941a194ba9fb6855cd46c9
 source=("os-release-$_wolos_commit::https://raw.githubusercontent.com/wonderlandos/wolos/$_wolos_commit/files/usr/share/wolos/os-release"
   wolos-os-release.hook base.manifest)
