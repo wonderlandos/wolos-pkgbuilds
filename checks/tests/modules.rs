@@ -2,9 +2,10 @@
 //! What this file checks (wolos-pkgbuilds): the optional module meta packages (ADR 0032,
 //! wolos docs/modules/modules.md). One `wolos-module-<id>/` per registry record in wolos
 //! (`files/usr/share/wolos/modules/<id>.json`, shipped by wolos-system), depends-only: `depends=` is
-//! wolos-system plus the record's `packages`, nothing is built, nothing outside Arch is a
-//! dependency, every one is a line of `packages`. The ignored test checks every dependency exists
-//! at the snapshot (network: `cargo test -- --ignored`).
+//! wolos-system plus the record's `packages`, nothing is built, nothing outside Arch or this repo's
+//! [wolos] packages is a dependency, every one is a line of `packages`. The developer module carries
+//! the Crystal userland runtime (crystal, libwol, the cryswol shard). The ignored test checks every
+//! other dependency exists at the snapshot (network: `cargo test -- --ignored`).
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]
 mod siblings;
@@ -138,6 +139,45 @@ fn every_record_has_its_meta_package_and_the_same_dependencies() {
     }
 }
 
+/// The [wolos] repo's package names (first field of each `packages` line).
+fn wolos_packages() -> Vec<String> {
+    read("packages")
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| l.split_whitespace().next().map(String::from))
+        .collect()
+}
+
+/// Crystal is the userland language and Cryswol its framework (ADR 0036): the developer module
+/// brings the compiler, libwol.so.1 and the shard under /usr/lib/wolos/crystal/cryswol, so a
+/// `require "cryswol"` program builds and runs on an installed system (the image does not ship
+/// them). libwol and cryswol come from [wolos]; no other module depends on a [wolos] package.
+#[test]
+fn dev_module_brings_the_crystal_runtime() {
+    let deps = pkgvar("wolos-module-dev", "depends");
+    for p in ["crystal", "libwol", "cryswol"] {
+        assert!(deps.iter().any(|d| d == p), "wolos-module-dev lacks {p}");
+    }
+    let ours = wolos_packages();
+    for p in ["libwol", "cryswol"] {
+        assert!(ours.iter().any(|o| o == p), "{p} is not a [wolos] package");
+    }
+    // The shard's recipe still pulls the runtime it links.
+    let shard = pkgvar("cryswol", "depends");
+    assert!(shard.iter().any(|d| d == "crystal") && shard.iter().any(|d| d == "libwol"));
+    for id in ids() {
+        let dir = format!("wolos-module-{id}");
+        for d in pkgvar(&dir, "depends") {
+            if d != "wolos-system" && ours.contains(&d) {
+                assert!(
+                    id == "dev" && (d == "libwol" || d == "cryswol"),
+                    "{dir}: [wolos] dependency {d}"
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn local_ai_takes_its_gpu_backend_on_the_root_side() {
     let deps = pkgvar("wolos-module-ai-local", "depends");
@@ -172,7 +212,8 @@ fn local_ai_takes_its_gpu_backend_on_the_root_side() {
 }
 
 /// Every dependency of every module is a package of the snapshot's core, extra or multilib repo (ADR 0032:
-/// "dependencies exist at the snapshot"). Needs the network and bsdtar.
+/// "dependencies exist at the snapshot"), or one of this repo's [wolos] packages (libwol, cryswol for
+/// the developer module, checked above). Needs the network and bsdtar.
 #[test]
 #[ignore = "network: downloads the snapshot's core, extra and multilib databases"]
 fn dependencies_exist_at_the_snapshot() {
@@ -202,9 +243,10 @@ fn dependencies_exist_at_the_snapshot() {
     }
     assert!(names.len() > 1000, "{} packages read", names.len());
     let mut missing = Vec::new();
+    let ours = wolos_packages();
     for id in ids() {
         for d in pkgvar(&format!("wolos-module-{id}"), "depends") {
-            if d != "wolos-system" && !names.contains(&d) {
+            if d != "wolos-system" && !ours.contains(&d) && !names.contains(&d) {
                 missing.push(format!("{id}: {d}"));
             }
         }
