@@ -15,7 +15,8 @@ wolos-system   wolos-system         hyprland-wolos                          wolo
 wopkg          wopkg                -                                       wopkg/
 libwol         libwol               -                                       libwol/
 libwolkit      libwolkit            -                                       libwolkit/
-wolkit         wolkit               libwolkit,libwol                        wolkit/
+cryswol        cryswol              libwol                                  cryswol/
+wolkit         wolkit               libwolkit,libwol,cryswol                wolkit/
 wolos-hue      wolos-hue            -                                       wolos-hue/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/

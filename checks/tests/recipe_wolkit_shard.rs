@@ -39,7 +39,7 @@ fn the_package_installs_the_shard_with_its_own_make_install() {
         assert!(p.contains(want), "PKGBUILD lacks {want}");
     }
     let depends = p.lines().find(|l| l.starts_with("depends=(")).unwrap();
-    for d in ["crystal", "libwolkit", "libwol"] {
+    for d in ["crystal", "cryswol", "libwolkit", "libwol"] {
         assert!(
             depends.split(['(', ')', ' ']).any(|w| w == d),
             "{depends} lacks {d}"

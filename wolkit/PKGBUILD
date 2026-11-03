@@ -11,8 +11,9 @@ pkgdesc='WolOS UI kit for Crystal: the wolkit shard, its default look and the ap
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(BSD-2-Clause)
-# Apps built with the shard link libwolkit and libwol and compile with wolkit-stylec (libwolkit).
-depends=(crystal libwolkit libwol)
+# The shard is built on cryswol (Wol::Handle, Wol.background); apps built with it link libwolkit and
+# libwol and compile with wolkit-stylec (libwolkit).
+depends=(crystal cryswol libwolkit libwol)
 makedepends=(git)
 options=(!debug)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). The shard is plain Crystal

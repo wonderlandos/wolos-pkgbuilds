@@ -193,11 +193,13 @@ fn modules_install_installs_queues_and_drains() {
     assert_eq!(log(&d), "", "nothing ran");
     // Installed: download bounded, against a temporary copy of the database (the slot's is on the
     // read-only seal, audit5 C9-1), then the plain install through the wrapper; nothing queued.
+    // Both refresh the repo lists (-y): a system installed offline has none, an older one names
+    // files the mirror no longer has (pre-release offline-modules run).
     let o = run(s, &d, &menv(&d), &["dev"]);
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     assert_eq!(
         log(&d),
-        "pacman --dbpath DB -Sw --noconfirm --needed wolos-module-dev\npacman -S --noconfirm --needed wolos-module-dev\n"
+        "pacman --dbpath DB -Syw --noconfirm --needed wolos-module-dev\npacman -Sy --noconfirm --needed wolos-module-dev\n"
     );
     assert_eq!(db_checks(&d), "copy\n");
     assert!(tmp_clean(&d), "the temporary database is removed");
@@ -206,7 +208,7 @@ fn modules_install_installs_queues_and_drains() {
     let d = modules_box("local", "-");
     assert!(run(s, &d, &menv(&d), &["ai-local"]).status.success());
     assert!(
-        log(&d).contains("pacman -S --noconfirm --needed wolos-module-ai-local ollama-cuda\n"),
+        log(&d).contains("pacman -Sy --noconfirm --needed wolos-module-ai-local ollama-cuda\n"),
         "{}",
         log(&d)
     );
@@ -228,6 +230,7 @@ fn modules_install_installs_queues_and_drains() {
     );
     // Into another root the chroot's own database is writable: no temporary copy there.
     assert!(!log(&d).contains("--dbpath"), "{}", log(&d));
+    // install-run refreshed that root itself when it was online: no -y there.
     assert!(log(&d).contains("pacman -Sw --noconfirm --needed wolos-module-dev\n"));
     assert_eq!(pending(&d).as_deref(), Some("creative\n"));
     // Drain: reads the pending file (bad lines dropped), installs, removes what installed.
@@ -253,7 +256,7 @@ fn modules_install_installs_queues_and_drains() {
     assert_eq!(o.status.code(), Some(1));
     assert_eq!(pending(&d), None);
     assert_eq!(pkg_pending(&d).as_deref(), Some("flac\n"));
-    assert!(log(&d).contains("pacman -S --noconfirm --needed wolos-module-dev\n"));
+    assert!(log(&d).contains("pacman -Sy --noconfirm --needed wolos-module-dev\n"));
     assert!(tmp_clean(&d));
     for bad in ["-x", "a b", "../x"] {
         let o = run(s, &d, &menv(&d), &["--package", bad]);
@@ -275,7 +278,7 @@ fn modules_install_installs_queues_and_drains() {
     assert_eq!(pkg_pending(&d), None, "drained");
     assert_eq!(
         log(&d),
-        "pacman --dbpath DB -Sw --noconfirm --needed flac\npacman -S --noconfirm --needed flac\n",
+        "pacman --dbpath DB -Syw --noconfirm --needed flac\npacman -Sy --noconfirm --needed flac\n",
         "each name once, the option line dropped"
     );
     // --queue (offline installer): nothing runs, the ids and packages are queued once.
