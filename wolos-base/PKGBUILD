@@ -11,7 +11,9 @@
 # with, and wolos-system's /etc/sudoers clashes with the chroot's sudo.
 pkgname=wolos-base
 pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgrel=3
+# Arch Linux Archive date this release is pinned to (../snapshot; tools/bump-snapshot.sh moves both).
+_snapshot=2026-11-02
 pkgdesc='WolOS base system: kernel, headers and userland of one release'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -55,6 +57,11 @@ package() {
   sed "s/@VERSION@/$pkgver/g" "$srcdir/os-release-$_wolos_commit" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/os-release"
   install -Dm644 "$srcdir/wolos-os-release.hook" "$pkgdir/usr/share/libalpm/hooks/wolos-os-release.hook"
   echo "$pkgver" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/base.version"
+  # The running release (wol_core::update::check::Running, RELEASE_FILE): version and archive date,
+  # no image hash (an image cannot carry its own). A system update replaces it with the package.
+  # The channel stays /etc/wolos/channel: the person changes it, a release does not.
+  printf '{"version":"%s","snapshot":"%s"}\n' "$pkgver" "${_snapshot//-//}" |
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/wolos-release.json"
   # Manifest last: it hashes the base packages and this package's own files.
   {
     cat "$srcdir/base.manifest"
