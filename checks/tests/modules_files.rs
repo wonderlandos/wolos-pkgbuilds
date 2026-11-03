@@ -796,8 +796,15 @@ fn bash_setup_runs_with_the_theme_colours_and_no_starship() {
     // `system_copy_is_the_default_render`), so its names are the ones `wol theme` writes; only the
     // accent changes, to tell the user file from the shipped one.
     let shipped = read("desktop/overlay/usr/share/wolos/toolkits/bash/colors.sh");
-    assert!(shipped.contains("WOLOS_ANSI_ACCENT='38;2;112;83;230'"), "{shipped}");
-    fs::write(&colors, shipped.replace("38;2;112;83;230", "38;2;124;92;255")).unwrap();
+    assert!(
+        shipped.contains("WOLOS_ANSI_ACCENT='38;2;112;83;230'"),
+        "{shipped}"
+    );
+    fs::write(
+        &colors,
+        shipped.replace("38;2;112;83;230", "38;2;124;92;255"),
+    )
+    .unwrap();
     let probe = format!(
         ". {}; _wolos_ps1; printf '%s\\n' \"H=$HISTSIZE\" \"P=$PS1\"",
         repo("desktop/overlay/usr/share/wolos/bash/bashrc").display()
@@ -897,11 +904,22 @@ fn commands_the_shipped_scripts_call_are_installed_by_the_image() {
     let word = |hay: &str, w: &str| {
         hay.lines()
             .filter(|l| !l.trim_start().starts_with('#'))
-            .any(|l| l.split(|c: char| c.is_whitespace() || c == '(' || c == ')').any(|t| t == w))
+            .any(|l| {
+                l.split(|c: char| c.is_whitespace() || c == '(' || c == ')')
+                    .any(|t| t == w)
+            })
     };
     for (script, cmd, pkg) in [
-        ("files/usr/lib/wolos/update-check", "arch-audit", "arch-audit"),
-        ("files/usr/lib/wolos/update-check", "checkupdates", "pacman-contrib"),
+        (
+            "files/usr/lib/wolos/update-check",
+            "arch-audit",
+            "arch-audit",
+        ),
+        (
+            "files/usr/lib/wolos/update-check",
+            "checkupdates",
+            "pacman-contrib",
+        ),
         ("files/usr/lib/wolos/verify-gpu.sh", "lspci", "pciutils"),
     ] {
         assert!(read(script).contains(cmd), "{script} no longer calls {cmd}");
@@ -910,4 +928,39 @@ fn commands_the_shipped_scripts_call_are_installed_by_the_image() {
             "{script} calls {cmd}: {pkg} is in neither wolos-system depends nor the ISO lists"
         );
     }
+}
+
+/// SHELLS-check F3: ghostty reads no system-wide config, so the WolOS defaults (and through them the
+/// generated theme) reach it only if wol-session links them as the user's own, never over a file
+/// the user has. The header must not promise a `--config-file` launcher nobody ships.
+#[test]
+fn wol_session_links_the_ghostty_defaults_without_overwriting() {
+    let s = read("desktop/overlay/usr/bin/wol-session");
+    let list = s
+        .lines()
+        .skip_while(|l| !l.starts_with("for f in gtk-4.0/gtk.css"))
+        .take(2)
+        .collect::<String>();
+    assert!(list.contains("ghostty/config"), "{list}");
+    assert!(list.contains("kitty/kitty.conf"), "{list}");
+    assert!(s.contains("if [ ! -e \"$cfg/$f\" ] && [ ! -L \"$cfg/$f\" ]; then"));
+    for f in list
+        .trim_start_matches("for f in")
+        .split(|c: char| c.is_whitespace() || c == ';' || c == '\\')
+        .filter(|w| w.contains('/') && !w.starts_with("do"))
+    {
+        let p = format!("desktop/overlay/usr/share/wolos/{f}");
+        assert!(
+            repo(&p).is_file(),
+            "wol-session links {f}: {p} is not shipped"
+        );
+    }
+    let gh = read("desktop/overlay/usr/share/wolos/ghostty/config");
+    assert!(gh.contains("wol-session"), "the header says who links it");
+    assert!(!gh.contains("WolOS starts it"), "no launcher is shipped");
+    let ky = read("desktop/overlay/usr/share/wolos/kitty/kitty.conf");
+    assert!(ky.contains("wol-session"), "the header says who links it");
+    assert!(ky.contains("include /usr/share/wolos/toolkits/kitty/theme.conf"));
+    assert!(ky.contains("include ~/.config/wolos/toolkits/kitty/theme.conf"));
+    assert!(repo("desktop/overlay/usr/share/wolos/toolkits/kitty/theme.conf").is_file());
 }

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# hyprland-wolos: Hyprland 0.56.2 (the snapshot's version) + the WolOS patches (0*.patch here),
-# applied in name order. Packaging follows Arch's hyprland 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
+# hyprland-wolos: Hyprland 0.56.2 + the WolOS patches (0*.patch here), applied in name order. 0.56.2 is
+# the last release that reads the legacy hyprlang config the shipped confs use (0.57.0 reads Lua); Arch's
+# own package moved on, so this recipe is the only source of it. Packaging follows Arch's hyprland
+# 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
 pkgrel=5
