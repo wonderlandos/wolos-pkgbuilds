@@ -36,6 +36,7 @@ source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.g
   0014-session-lock-a-dead-locker-leaves-black-while-one-can.patch
   0015-layout-a-dragged-window-never-goes-under-the-menu-bar.patch
   0016-monitor-max_bpc-only-when-built-against-aquamarine-0.patch
+  0017-ipc-keyword-and-the-0.56-dispatch-form-on-the-lua-co.patch
 )
 sha256sums=('24e7428f83115e58e5fc81f100f6b73691dcaaf7a503087391e44327a71c43ab'
             '40647562991a3f7db73c10008f1e716bdbdababf0965a6d22c27c59def32e295'
@@ -52,7 +53,8 @@ sha256sums=('24e7428f83115e58e5fc81f100f6b73691dcaaf7a503087391e44327a71c43ab'
             '25ab5fcca307d172b076975963a8b08ab625b44565bfc672d0237de118900032'
             '6e7f1f096a2d1e50f0bfb341a10c81ff4c0e4713790da9fdfd029dade125787b'
             'a3e828bcb5bd18188356ce30a5480d1b18e20ad7eaedaaa948ee02201b191e65'
-            '6302f574c950bc09fd959e21c02f3a603c63b5bae8e6e5f038d0cec11d4d7c1d')
+            '6302f574c950bc09fd959e21c02f3a603c63b5bae8e6e5f038d0cec11d4d7c1d'
+            '6a05f1d1bb9a66e4a3a39d7bb44568cb0b7b6a88da6d99e7c16c23f566d03977')
 
 prepare() {
   ln -sf hyprland-source "$_archive"
