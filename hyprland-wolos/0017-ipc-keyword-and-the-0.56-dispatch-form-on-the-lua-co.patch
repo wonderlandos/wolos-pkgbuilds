@@ -1,0 +1,1294 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: klee <71413974+kleeedolinux@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 15:51:57 +0000
+Subject: [PATCH] ipc: hyprctl keyword and the 0.56 dispatch form, on the Lua
+ configuration
+
+0.57 dropped the keyword command and reads dispatch as hl.dispatch(<lua>), so
+every WolOS tool that set an option, a bind or a window rule live, or sent a
+0.56 dispatcher (theme switch, Settings, zoom, overview, switcher, the Dock,
+hypridle), got an error. keyword NAME VALUE becomes the Lua call it means
+(hl.config with a typed literal, hl.bind/hl.unbind, hl.animation, the named
+rule's hl.window_rule) and runs like eval; dispatch NAME ARGS with a 0.56
+dispatcher name runs it through the 0.56 translator, back on Config::Actions;
+keyword binds call it through hl.legacy_dispatch. Lua forms are unchanged.
+Translation in WolosCompat.hpp, gtest in tests/helpers/WolosCompat.cpp.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/config/legacy/DispatcherTranslator.cpp    | 808 ++++++++++++++++++
+ src/config/legacy/DispatcherTranslator.hpp    |  27 +
+ .../lua/bindings/LuaBindingsToplevel.cpp      |  17 +
+ src/helpers/WolosCompat.hpp                   | 244 ++++++
+ src/ipc/s1/Commands.cpp                       |  28 +
+ tests/helpers/WolosCompat.cpp                 |  58 ++
+ 6 files changed, 1182 insertions(+)
+ create mode 100644 src/config/legacy/DispatcherTranslator.cpp
+ create mode 100644 src/config/legacy/DispatcherTranslator.hpp
+ create mode 100644 src/helpers/WolosCompat.hpp
+ create mode 100644 tests/helpers/WolosCompat.cpp
+
+diff --git a/src/config/legacy/DispatcherTranslator.cpp b/src/config/legacy/DispatcherTranslator.cpp
+new file mode 100644
+index 0000000..9fc324d
+--- /dev/null
++++ b/src/config/legacy/DispatcherTranslator.cpp
+@@ -0,0 +1,808 @@
++#include "DispatcherTranslator.hpp"
++
++#include "../shared/actions/ConfigActions.hpp"
++#include "../supplementary/executor/Executor.hpp"
++#include "../../Compositor.hpp"
++#include "../../desktop/state/FocusState.hpp"
++#include "../../output/Monitor.hpp"
++#include "../../desktop/view/Group.hpp"
++#include "../../keybinds/Resolver.hpp"
++#include "../../managers/SeatManager.hpp"
++#include "../../managers/input/InputManager.hpp"
++#include "../../managers/fullscreen/FullscreenController.hpp"
++#include "../../layout/LayoutManager.hpp"
++#include "../../state/MonitorState.hpp"
++#include "../../state/WorkspaceState.hpp"
++#include "../../state/workspace/Resolver.hpp"
++#include "../../state/workspace/State.hpp"
++#include "../../workspace/HLWorkspace.hpp"
++#include "../../workspace/WorkspaceUtils.hpp"
++
++#include <hyprutils/string/String.hpp>
++#include <hyprutils/string/VarList2.hpp>
++using namespace Hyprutils::String;
++
++using namespace Config;
++using namespace Config::Legacy;
++using namespace Config::Actions;
++
++UP<CDispatcherTranslator>& Legacy::translator() {
++    static UP<CDispatcherTranslator> p = makeUnique<CDispatcherTranslator>();
++    return p;
++}
++
++SDispatchResult CDispatcherTranslator::run(const std::string& d, const std::string& w) {
++    if (!m_dispMap.contains(d))
++        return {.success = false, .error = "Bad dispatcher"};
++
++    return m_dispMap.at(d)(w);
++}
++
++// helper: convert ActionResult to SDispatchResult
++static SDispatchResult wrap(ActionResult res) {
++    if (!res)
++        return {.success = false, .error = res.error().message};
++    return {.passEvent = res->passEvent};
++}
++
++// helper: resolve window from regex string, or focused if empty/active
++static std::optional<PHLWINDOW> windowFromArg(const std::string& arg) {
++    if (arg.empty() || arg == "active")
++        return std::nullopt; // will use xtract(nullopt) -> focused window
++    return Desktop::viewState()->query().selector(arg).runWindow();
++}
++
++// helper: resolve workspace from string and optionally create it
++static PHLWORKSPACE findWorkspace(const std::string& args) {
++    const auto TARGET = State::Workspace::resolver()->getWorkspaceTargetFromString(args);
++    if (!TARGET.valid())
++        return nullptr;
++    return State::Workspace::state()->find(TARGET);
++}
++
++static PHLWORKSPACE resolveWorkspace(const std::string& args) {
++    const auto TARGET = State::Workspace::resolver()->getWorkspaceTargetFromString(args);
++    if (!TARGET.valid())
++        return nullptr;
++    auto ws = State::Workspace::state()->find(TARGET);
++    if (!ws) {
++        const auto PMONITOR = Desktop::focusState()->monitor();
++        if (PMONITOR)
++            ws = State::Workspace::state()->create(TARGET, PMONITOR);
++    }
++    return ws;
++}
++
++static SDispatchResult exec(const std::string& args) {
++    const auto PROC = Config::Supplementary::executor()->spawn(args);
++    if (!PROC.has_value())
++        return {.success = false, .error = std::format("Failed to start process. No closing bracket in exec rule. {}", args)};
++    return {.success = PROC.value() > 0, .error = std::format("Failed to start process {}", args)};
++}
++
++static SDispatchResult execr(const std::string& args) {
++    const auto PROC = Config::Supplementary::executor()->spawnRaw(args);
++    return {.success = PROC && *PROC > 0, .error = std::format("Failed to start process {}", args)};
++}
++
++static SDispatchResult killactive(const std::string&) {
++    return wrap(Actions::closeWindow());
++}
++
++static SDispatchResult forcekillactive(const std::string&) {
++    return wrap(Actions::killWindow());
++}
++
++static SDispatchResult closewindow(const std::string& data) {
++    return wrap(Actions::closeWindow(Desktop::viewState()->query().selector(data).runWindow()));
++}
++
++static SDispatchResult killwindow(const std::string& data) {
++    return wrap(Actions::killWindow(Desktop::viewState()->query().selector(data).runWindow()));
++}
++
++static SDispatchResult signalactive(const std::string& args) {
++    if (!isNumber(args))
++        return {.success = false, .error = "signalActive: signal has to be int"};
++    try {
++        return wrap(Actions::signalWindow(std::stoi(args)));
++    } catch (...) { return {.success = false, .error = "signalActive: invalid signal format"}; }
++}
++
++static SDispatchResult signalwindow(const std::string& args) {
++    const auto WINDOWREGEX = args.substr(0, args.find_first_of(','));
++    const auto SIGNAL      = args.substr(args.find_first_of(',') + 1);
++
++    const auto PWINDOW = Desktop::viewState()->query().selector(WINDOWREGEX).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "signalWindow: no window"};
++
++    if (!isNumber(SIGNAL))
++        return {.success = false, .error = "signalWindow: signal has to be int"};
++
++    try {
++        return wrap(Actions::signalWindow(std::stoi(SIGNAL), PWINDOW));
++    } catch (...) { return {.success = false, .error = "signalWindow: invalid signal format"}; }
++}
++
++static SDispatchResult togglefloating(const std::string& args) {
++    auto w = windowFromArg(args);
++    return wrap(Actions::floatWindow(TOGGLE_ACTION_TOGGLE, w));
++}
++
++static SDispatchResult setfloating(const std::string& args) {
++    auto w = windowFromArg(args);
++    return wrap(Actions::floatWindow(TOGGLE_ACTION_ENABLE, w));
++}
++
++static SDispatchResult settiled(const std::string& args) {
++    auto w = windowFromArg(args);
++    return wrap(Actions::floatWindow(TOGGLE_ACTION_DISABLE, w));
++}
++
++static SDispatchResult pseudo(const std::string& args) {
++    auto w = windowFromArg(args);
++    return wrap(Actions::pseudoWindow(TOGGLE_ACTION_TOGGLE, w));
++}
++
++static SDispatchResult workspace(const std::string& args) {
++    return wrap(Actions::changeWorkspace(args));
++}
++
++static SDispatchResult renameworkspace(const std::string& args) {
++    try {
++        const auto FIRSTSPACEPOS = args.find_first_of(' ');
++        if (FIRSTSPACEPOS != std::string::npos) {
++            int         wsid = std::stoi(args.substr(0, FIRSTSPACEPOS));
++            std::string name = args.substr(FIRSTSPACEPOS + 1);
++            const auto  PWS  = findWorkspace(std::to_string(wsid));
++            if (!PWS)
++                return {.success = false, .error = "No such workspace"};
++            return wrap(Actions::renameWorkspace(PWS, name));
++        } else {
++            const auto PWS = findWorkspace(std::to_string(std::stoi(args)));
++            if (!PWS)
++                return {.success = false, .error = "No such workspace"};
++            return wrap(Actions::renameWorkspace(PWS, ""));
++        }
++    } catch (std::exception& e) { return {.success = false, .error = std::format("Invalid arg in renameWorkspace: {}", e.what())}; }
++}
++
++static SDispatchResult fullscreen(const std::string& args) {
++
++    CVarList2                         ARGS(args, 2, ' ');
++
++    const Fullscreen::eFullscreenMode MODE = ARGS.size() > 0 && ARGS[0] == "1" ? Fullscreen::FSMODE_MAXIMIZED : Fullscreen::FSMODE_FULLSCREEN;
++
++    if (ARGS.size() <= 1 || ARGS[1] == "toggle")
++        return wrap(Actions::fullscreenWindow(MODE, true));
++
++    // "set" means enable, "unset" means disable - but the Action toggles.
++    // We need to check current state ourselves.
++    const auto PWINDOW = Desktop::focusState()->window();
++    if (!PWINDOW)
++        return {.success = false, .error = "Window not found"};
++
++    if (ARGS[1] == "set") {
++        if (!Fullscreen::controller()->isFullscreen(PWINDOW, MODE))
++            return wrap(Actions::fullscreenWindow(MODE, true));
++        return {};
++    } else if (ARGS[1] == "unset") {
++        if (Fullscreen::controller()->isFullscreen(PWINDOW, MODE))
++            return wrap(Actions::fullscreenWindow(MODE, true));
++        return {};
++    }
++
++    return {};
++}
++
++static SDispatchResult fullscreenstate(const std::string& args) {
++    CVarList2  ARGS(args, 3, ' ');
++
++    const auto PWINDOW = Desktop::focusState()->window();
++    if (!PWINDOW)
++        return {.success = false, .error = "Window not found"};
++
++    int internalMode, clientMode;
++    try {
++        internalMode = std::stoi(std::string(ARGS[0]));
++    } catch (...) { internalMode = -1; }
++    try {
++        clientMode = std::stoi(std::string(ARGS[1]));
++    } catch (...) { clientMode = -1; }
++
++    Fullscreen::eFullscreenMode im = internalMode != -1 ? sc<Fullscreen::eFullscreenMode>(internalMode) : Fullscreen::controller()->getFullscreenModes(PWINDOW).internal;
++    Fullscreen::eFullscreenMode cm = clientMode != -1 ? sc<Fullscreen::eFullscreenMode>(clientMode) : Fullscreen::controller()->getFullscreenModes(PWINDOW).client;
++
++    return wrap(Actions::fullscreenWindow(im, cm, true));
++}
++
++static SDispatchResult movetoworkspace(const std::string& args) {
++    PHLWINDOW   PWINDOW = Desktop::focusState()->window();
++    std::string wsArgs  = args;
++
++    if (args.contains(',')) {
++        PWINDOW = Desktop::viewState()->query().selector(args.substr(args.find_last_of(',') + 1)).runWindow();
++        wsArgs  = args.substr(0, args.find_last_of(','));
++    }
++
++    auto ws = resolveWorkspace(wsArgs);
++    if (!ws)
++        return {.success = false, .error = "Invalid workspace"};
++
++    return wrap(Actions::moveToWorkspace(ws, false, PWINDOW));
++}
++
++static SDispatchResult movetoworkspacesilent(const std::string& args) {
++    PHLWINDOW   PWINDOW = Desktop::focusState()->window();
++    std::string wsArgs  = args;
++
++    if (args.contains(',')) {
++        PWINDOW = Desktop::viewState()->query().selector(args.substr(args.find_last_of(',') + 1)).runWindow();
++        wsArgs  = args.substr(0, args.find_last_of(','));
++    }
++
++    auto ws = resolveWorkspace(wsArgs);
++    if (!ws)
++        return {.success = false, .error = "Invalid workspace"};
++
++    return wrap(Actions::moveToWorkspace(ws, true, PWINDOW));
++}
++
++static SDispatchResult movefocus(const std::string& args) {
++    Math::eDirection dir = Math::fromChar(args[0]);
++    if (dir == Math::DIRECTION_DEFAULT)
++        return {.success = false, .error = std::format("Unsupported direction: {}", args[0])};
++    return wrap(Actions::moveFocus(dir));
++}
++
++static SDispatchResult movewindow(const std::string& args) {
++    // "movewindow" dispatcher handles both "mon:<monitor>" and directional moves.
++    // For mon: prefix, it delegates to movetoworkspace.
++    bool silent    = args.ends_with(" silent");
++    auto cleanArgs = silent ? args.substr(0, args.length() - 7) : args;
++
++    if (cleanArgs.starts_with("mon:")) {
++        const auto PNEWMONITOR = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(cleanArgs.substr(4)).run();
++        if (!PNEWMONITOR)
++            return {.success = false, .error = std::format("Monitor {} not found", cleanArgs.substr(4))};
++
++        auto ws = PNEWMONITOR->m_activeWorkspace;
++        return wrap(Actions::moveToWorkspace(ws, silent));
++    }
++
++    Math::eDirection dir = Math::fromChar(cleanArgs[0]);
++    if (dir == Math::DIRECTION_DEFAULT)
++        return {.success = false, .error = std::format("Unsupported direction: {}", cleanArgs[0])};
++
++    return wrap(Actions::moveInDirection(dir));
++}
++
++static SDispatchResult swapwindow(const std::string& args) {
++    if (isDirection(args))
++        return wrap(Actions::swapInDirection(Math::fromChar(args[0])));
++
++    // regex-based swap: resolve window and use swapInDirection? No - the old code used selector lookup + switchTargets.
++    // The new Actions don't have a "swap with specific window" variant.
++    // Fall through to the old swapActive logic via selector lookup + layout switchTargets.
++    const auto PLASTWINDOW = Desktop::focusState()->window();
++    if (!PLASTWINDOW)
++        return {.success = false, .error = "Window to swap with not found"};
++    if (Fullscreen::controller()->isFullscreen(PLASTWINDOW))
++        return {.success = false, .error = "Can't swap fullscreen window"};
++
++    const auto PWINDOWTOCHANGETO = Desktop::viewState()->query().selector(args).runWindow();
++    if (!PWINDOWTOCHANGETO || PWINDOWTOCHANGETO == PLASTWINDOW)
++        return {.success = false, .error = std::format("Can't swap with {}, invalid window", args)};
++
++    g_layoutManager->switchTargets(PLASTWINDOW->layoutTarget(), PWINDOWTOCHANGETO->layoutTarget(), true);
++    PLASTWINDOW->warpCursor();
++    return {};
++}
++
++static SDispatchResult centerwindow(const std::string&) {
++    return wrap(Actions::center());
++}
++
++static SDispatchResult togglegroup(const std::string&) {
++    return wrap(Actions::toggleGroup());
++}
++
++static SDispatchResult changegroupactive(const std::string& args) {
++    bool forward = !(args == "b" || args == "prev");
++
++    // index-based change: not kept by the WolOS compatibility layer (0.57 groups are a window membership)
++    if (isNumber(args, false))
++        return {.success = false, .error = "changegroupactive: an index is not supported, use b/f"};
++
++    return wrap(Actions::changeGroupActive(forward));
++}
++
++static SDispatchResult movegroupwindow(const std::string& args) {
++    return wrap(Actions::moveGroupWindow(!(args == "b" || args == "prev")));
++}
++
++static SDispatchResult focusmonitor(const std::string& args) {
++    const auto PMONITOR = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(args).run();
++    if (!PMONITOR)
++        return {.success = false, .error = "Monitor not found"};
++    return wrap(Actions::focusMonitor(PMONITOR));
++}
++
++static SDispatchResult movecursortocorner(const std::string& args) {
++    if (!isNumber(args))
++        return {.success = false, .error = "moveCursorToCorner, arg has to be a number"};
++    return wrap(Actions::moveCursorToCorner(std::stoi(args)));
++}
++
++static SDispatchResult movecursor(const std::string& args) {
++    size_t i = args.find_first_of(' ');
++    if (i == std::string::npos)
++        return {.success = false, .error = "moveCursor takes 2 arguments"};
++
++    auto x_str = args.substr(0, i);
++    auto y_str = args.substr(i + 1);
++
++    if (!isNumber(x_str) || !isNumber(y_str))
++        return {.success = false, .error = "moveCursor arguments must be numbers"};
++
++    return wrap(Actions::moveCursor({std::stoi(x_str), std::stoi(y_str)}));
++}
++
++static SDispatchResult workspaceopt(const std::string&) {
++    return {.success = false, .error = "workspaceopt is deprecated"};
++}
++
++static SDispatchResult exitHyprland(const std::string&) {
++    return wrap(Actions::exit());
++}
++
++static SDispatchResult movecurrentworkspacetomonitor(const std::string& args) {
++    const auto PMONITOR = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(args).run();
++    if (!PMONITOR)
++        return {.success = false, .error = "Monitor not found"};
++
++    const auto PCURRENTWORKSPACE = Desktop::focusState()->monitor()->m_activeWorkspace;
++    if (!PCURRENTWORKSPACE)
++        return {.success = false, .error = "Invalid workspace"};
++
++    return wrap(Actions::moveToMonitor(PCURRENTWORKSPACE, PMONITOR));
++}
++
++static SDispatchResult moveworkspacetomonitor(const std::string& args) {
++    if (!args.contains(' '))
++        return {.success = false, .error = "Expected: workspace monitor"};
++
++    std::string wsStr  = args.substr(0, args.find_first_of(' '));
++    std::string monStr = args.substr(args.find_first_of(' ') + 1);
++
++    const auto  PMONITOR = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(monStr).run();
++    if (!PMONITOR)
++        return {.success = false, .error = "Monitor not found"};
++
++    const auto PWORKSPACE = findWorkspace(wsStr);
++    if (!PWORKSPACE)
++        return {.success = false, .error = "Workspace not found"};
++
++    return wrap(Actions::moveToMonitor(PWORKSPACE, PMONITOR));
++}
++
++static SDispatchResult focusworkspaceoncurrentmonitor(const std::string& args) {
++    auto ws = resolveWorkspace(args);
++    if (!ws)
++        return {.success = false, .error = "Invalid workspace"};
++    return wrap(Actions::changeWorkspaceOnCurrentMonitor(ws));
++}
++
++static SDispatchResult togglespecialworkspace(const std::string& args) {
++    const auto TARGET = State::Workspace::resolver()->getWorkspaceTargetFromString(::Workspace::specialWorkspaceAddressFromName(args));
++    if (!TARGET.valid() || TARGET.type != ::Workspace::eWorkspaceType::SPECIAL)
++        return {.success = false, .error = "Invalid special workspace"};
++
++    auto ws = State::Workspace::state()->find(TARGET);
++    if (!ws) {
++        const auto PMONITOR = Desktop::focusState()->monitor();
++        if (PMONITOR)
++            ws = State::Workspace::state()->create(TARGET, PMONITOR);
++    }
++
++    if (!ws)
++        return {.success = false, .error = "Could not resolve special workspace"};
++
++    const auto RES = wrap(Actions::toggleSpecial(ws));
++    ws->ready();
++    return RES;
++}
++
++static SDispatchResult forcerendererreload(const std::string&) {
++    return wrap(Actions::forceRendererReload());
++}
++
++static SDispatchResult resizeactive(const std::string& args) {
++    const auto PWINDOW = Desktop::focusState()->window();
++    if (!PWINDOW)
++        return {.success = false, .error = "No window found"};
++
++    const auto SIZ = g_pCompositor->parseWindowVectorArgsRelative(args, PWINDOW->size(Desktop::View::IGeometric::GEOMETRIC_GOAL));
++    if (SIZ.x < 1 || SIZ.y < 1)
++        return {.success = false, .error = "Invalid size"};
++
++    return wrap(Actions::resize(SIZ));
++}
++
++static SDispatchResult moveactive(const std::string& args) {
++    const auto PWINDOW = Desktop::focusState()->window();
++    if (!PWINDOW)
++        return {.success = false, .error = "No window found"};
++
++    const auto POS = g_pCompositor->parseWindowVectorArgsRelative(args, PWINDOW->position(Desktop::View::IGeometric::GEOMETRIC_GOAL));
++    return wrap(Actions::move(POS));
++}
++
++static SDispatchResult movewindowpixel(const std::string& args) {
++    const auto WINDOWREGEX = args.substr(args.find_first_of(',') + 1);
++    const auto MOVECMD     = args.substr(0, args.find_first_of(','));
++
++    const auto PWINDOW = Desktop::viewState()->query().selector(WINDOWREGEX).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "moveWindow: no window"};
++
++    const auto POS = g_pCompositor->parseWindowVectorArgsRelative(MOVECMD, PWINDOW->position(Desktop::View::IGeometric::GEOMETRIC_GOAL));
++    return wrap(Actions::move(POS, false, PWINDOW));
++}
++
++static SDispatchResult resizewindowpixel(const std::string& args) {
++    const auto WINDOWREGEX = args.substr(args.find_first_of(',') + 1);
++    const auto MOVECMD     = args.substr(0, args.find_first_of(','));
++
++    const auto PWINDOW = Desktop::viewState()->query().selector(WINDOWREGEX).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "resizeWindow: no window"};
++
++    const auto SIZ = g_pCompositor->parseWindowVectorArgsRelative(MOVECMD, PWINDOW->size(Desktop::View::IGeometric::GEOMETRIC_GOAL));
++    if (SIZ.x < 1 || SIZ.y < 1)
++        return {.success = false, .error = "Invalid size"};
++
++    return wrap(Actions::resize(SIZ, false, PWINDOW));
++}
++
++static SDispatchResult cyclenext(const std::string& arg) {
++    CVarList2           args(arg, 0, 's', true);
++
++    const bool          PREV = args.contains("prev") || args.contains("p") || args.contains("last") || args.contains("l");
++    const bool          NEXT = args.contains("next") || args.contains("n");
++
++    std::optional<bool> onlyTiled    = {};
++    std::optional<bool> onlyFloating = {};
++
++    if (args.contains("tile") || args.contains("tiled"))
++        onlyTiled = true;
++    if (args.contains("float") || args.contains("floating"))
++        onlyFloating = true;
++
++    // "hist" and "visible" modes are not mapped to the new API - they remain niche.
++    // The new cycleNext uses a simple next/prev boolean.
++    // PREV is default in classic alt+tab, NEXT overrides it.
++    return wrap(Actions::cycleNext(NEXT || !PREV, onlyTiled, onlyFloating));
++}
++
++static SDispatchResult focuswindow(const std::string& regexp) {
++    const auto PWINDOW = Desktop::viewState()->query().selector(regexp).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "No such window found"};
++    return wrap(Actions::focus(PWINDOW));
++}
++
++static SDispatchResult tagwindow(const std::string& args) {
++    CVarList2 vars(args, 0, 's', true);
++
++    PHLWINDOW PWINDOW = nullptr;
++    if (vars.size() == 1)
++        ; // use focused (nullptr)
++    else if (vars.size() == 2)
++        PWINDOW = Desktop::viewState()->query().selector(std::string(vars[1])).runWindow();
++    else
++        return {.success = false, .error = "Invalid number of arguments, expected 1 or 2"};
++
++    return wrap(Actions::tag(std::string(vars[0]), PWINDOW));
++}
++
++static SDispatchResult toggleswallow(const std::string&) {
++    return wrap(Actions::toggleSwallow());
++}
++
++static SDispatchResult setsubmap(const std::string& submap) {
++    return wrap(Actions::setSubmap(submap));
++}
++
++static SDispatchResult passDispatcher(const std::string& regexp) {
++    const auto PWINDOW = Desktop::viewState()->query().selector(regexp).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "pass: window not found"};
++    return wrap(Actions::pass(PWINDOW));
++}
++
++// WolOS 0017: keys resolve through the compositor's keycode resolver (any layout, held modifiers ignored:
++// patch 0006), the same as the Lua send_shortcut / send_key_state dispatchers.
++static SDispatchResult sendshortcut(const std::string& args) {
++    CVarList2 ARGS(args, 3);
++    if (ARGS.size() != 3)
++        return {.success = false, .error = "sendshortcut: invalid args"};
++
++    const auto MOD     = Keybinds::modMaskFromString(std::string(ARGS[0]));
++    const auto KEYCODE = Keybinds::resolver()->resolveKeycode(std::string(ARGS[1]));
++    if (!KEYCODE)
++        return {.success = false, .error = std::format("sendshortcut: {}", KEYCODE.error())};
++
++    const std::string regexp  = std::string(ARGS[2]);
++    PHLWINDOW         PWINDOW = regexp.empty() ? nullptr : Desktop::viewState()->query().selector(regexp).runWindow();
++
++    if (!regexp.empty() && !PWINDOW)
++        return {.success = false, .error = "sendshortcut: window not found"};
++
++    return wrap(Actions::pass(MOD, *KEYCODE, PWINDOW ? std::optional<PHLWINDOW>{PWINDOW} : std::nullopt));
++}
++
++static SDispatchResult sendkeystate(const std::string& args) {
++    CVarList2 ARGS(args, 4);
++    if (ARGS.size() != 4)
++        return {.success = false, .error = "sendkeystate: invalid args"};
++
++    const auto STATE = ARGS[2];
++    if (STATE != "down" && STATE != "repeat" && STATE != "up")
++        return {.success = false, .error = "sendkeystate: invalid state, must be 'down', 'repeat', or 'up'"};
++    const uint32_t keyState = STATE == "down" ? 1 : STATE == "repeat" ? 2 : 0;
++
++    const auto     MOD     = Keybinds::modMaskFromString(std::string(ARGS[0]));
++    const auto     KEYCODE = Keybinds::resolver()->resolveKeycode(std::string(ARGS[1]));
++    if (!KEYCODE)
++        return {.success = false, .error = std::format("sendkeystate: {}", KEYCODE.error())};
++
++    const std::string regexp  = std::string(ARGS[3]);
++    PHLWINDOW         PWINDOW = regexp.empty() ? nullptr : Desktop::viewState()->query().selector(regexp).runWindow();
++    if (!regexp.empty() && !PWINDOW)
++        return {.success = false, .error = "sendkeystate: window not found"};
++
++    return wrap(Actions::sendKeyState(MOD, *KEYCODE, keyState, PWINDOW ? std::optional<PHLWINDOW>{PWINDOW} : std::nullopt));
++}
++
++static SDispatchResult layoutmsg(const std::string& msg) {
++    return wrap(Actions::layoutMessage(msg));
++}
++
++static SDispatchResult dpmsDispatcher(const std::string& arg) {
++    eTogglableAction action;
++    if (arg.starts_with("on"))
++        action = TOGGLE_ACTION_ENABLE;
++    else if (arg.starts_with("toggle"))
++        action = TOGGLE_ACTION_TOGGLE;
++    else
++        action = TOGGLE_ACTION_DISABLE;
++
++    std::optional<PHLMONITOR> mon = std::nullopt;
++    if (arg.find_first_of(' ') != std::string::npos) {
++        auto port = arg.substr(arg.find_first_of(' ') + 1);
++        auto pMon = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(port).run();
++        if (pMon)
++            mon = pMon;
++    }
++
++    return wrap(Actions::dpms(action, mon));
++}
++
++static SDispatchResult swapnext(const std::string& arg) {
++    return wrap(Actions::swapNext(arg != "l" && arg != "last" && arg != "prev" && arg != "b" && arg != "back"));
++}
++
++static SDispatchResult swapactiveworkspaces(const std::string& args) {
++    const auto MON1 = args.substr(0, args.find_first_of(' '));
++    const auto MON2 = args.substr(args.find_first_of(' ') + 1);
++
++    const auto PMON1 = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(MON1).run();
++    const auto PMON2 = State::monitorState()->query().relativeTo(Desktop::focusState()->monitor()).configString(MON2).run();
++
++    if (!PMON1 || !PMON2)
++        return {.success = false, .error = "Monitor not found"};
++
++    return wrap(Actions::swapActiveWorkspaces(PMON1, PMON2));
++}
++
++static SDispatchResult pin(const std::string& args) {
++    auto w = windowFromArg(args);
++    return wrap(Actions::pinWindow(TOGGLE_ACTION_TOGGLE, w));
++}
++
++static SDispatchResult mouseDispatcher(const std::string& args) {
++    return wrap(Actions::mouse(args.substr(1)));
++}
++
++static SDispatchResult bringactivetotop(const std::string&) {
++    return wrap(Actions::alterZOrder("top"));
++}
++
++static SDispatchResult alterzorder(const std::string& args) {
++    const auto WINDOWREGEX = args.substr(args.find_first_of(',') + 1);
++    const auto POSITION    = args.substr(0, args.find_first_of(','));
++
++    auto       PWINDOW = Desktop::viewState()->query().selector(WINDOWREGEX).runWindow();
++    if (!PWINDOW && Desktop::focusState()->window() && Desktop::focusState()->window()->isFloating())
++        PWINDOW = Desktop::focusState()->window();
++
++    return wrap(Actions::alterZOrder(POSITION, PWINDOW));
++}
++
++static SDispatchResult focusurgentorlast(const std::string&) {
++    return wrap(Actions::focusUrgentOrLast());
++}
++
++static SDispatchResult focuscurrentorlast(const std::string&) {
++    return wrap(Actions::focusCurrentOrLast());
++}
++
++static SDispatchResult lockgroups(const std::string& args) {
++    eTogglableAction action;
++    if (args == "toggle")
++        action = TOGGLE_ACTION_TOGGLE;
++    else if (args == "lock" || args.empty() || args == "lockgroups")
++        action = TOGGLE_ACTION_ENABLE;
++    else
++        action = TOGGLE_ACTION_DISABLE;
++    return wrap(Actions::lockGroup(action));
++}
++
++static SDispatchResult lockactivegroup(const std::string& args) {
++    eTogglableAction action;
++    if (args == "toggle")
++        action = TOGGLE_ACTION_TOGGLE;
++    else if (args == "lock")
++        action = TOGGLE_ACTION_ENABLE;
++    else
++        action = TOGGLE_ACTION_DISABLE;
++    return wrap(Actions::lockGroup(action));
++}
++
++static SDispatchResult moveintogroup(const std::string& args) {
++    Math::eDirection dir = Math::fromChar(args[0]);
++    if (dir == Math::DIRECTION_DEFAULT)
++        return {.success = false, .error = std::format("Unsupported direction: {}", args[0])};
++    return wrap(Actions::moveIntoGroup(dir));
++}
++
++static SDispatchResult moveintoorcreategroup(const std::string& args) {
++    Math::eDirection dir = Math::fromChar(args[0]);
++    if (dir == Math::DIRECTION_DEFAULT)
++        return {.success = false, .error = std::format("Unsupported direction: {}", args[0])};
++    return wrap(Actions::moveIntoOrCreateGroup(dir));
++}
++
++static SDispatchResult moveoutofgroup(const std::string& args) {
++    if (args != "active" && args.length() > 1) {
++        auto PWINDOW = Desktop::viewState()->query().selector(args).runWindow();
++        return wrap(Actions::moveOutOfGroup(Math::DIRECTION_DEFAULT, PWINDOW));
++    }
++    return wrap(Actions::moveOutOfGroup(Math::DIRECTION_DEFAULT));
++}
++
++static SDispatchResult movewindoworgroup(const std::string& args) {
++    Math::eDirection dir = Math::fromChar(args[0]);
++    if (dir == Math::DIRECTION_DEFAULT)
++        return {.success = false, .error = std::format("Unsupported direction: {}", args[0])};
++    return wrap(Actions::moveWindowOrGroup(dir));
++}
++
++static SDispatchResult denywindowfromgroup(const std::string& args) {
++    eTogglableAction action;
++    if (args == "toggle")
++        action = TOGGLE_ACTION_TOGGLE;
++    else if (args == "on")
++        action = TOGGLE_ACTION_ENABLE;
++    else
++        action = TOGGLE_ACTION_DISABLE;
++    return wrap(Actions::denyWindowFromGroup(action));
++}
++
++static SDispatchResult eventDispatcher(const std::string& args) {
++    return wrap(Actions::event(args));
++}
++
++static SDispatchResult globalDispatcher(const std::string& args) {
++    return wrap(Actions::global(args));
++}
++
++static SDispatchResult setprop(const std::string& args) {
++    CVarList2 vars(args, 3, ' ');
++    if (vars.size() < 3)
++        return {.success = false, .error = "Not enough args"};
++
++    const auto PWINDOW = Desktop::viewState()->query().selector(std::string(vars[0])).runWindow();
++    if (!PWINDOW)
++        return {.success = false, .error = "Window not found"};
++
++    // Reconstruct val from remaining args (for multi-arg values like colors)
++    return wrap(Actions::setProp(std::string(vars[1]), vars.join(" ", 2), PWINDOW));
++}
++
++static SDispatchResult forceidle(const std::string& args) {
++    std::optional<float> duration = getPlusMinusKeywordResult(args, 0);
++    if (!duration.has_value())
++        return {.success = false, .error = "Duration invalid in forceIdle"};
++    return wrap(Actions::forceIdle(duration.value()));
++}
++
++static SDispatchResult releaseInputCapture(const std::string& args) {
++    return wrap(Actions::releaseInputCapture());
++}
++
++CDispatcherTranslator::CDispatcherTranslator() {
++    m_dispMap["exec"]                           = ::exec;
++    m_dispMap["execr"]                          = ::execr;
++    m_dispMap["killactive"]                     = ::killactive;
++    m_dispMap["forcekillactive"]                = ::forcekillactive;
++    m_dispMap["closewindow"]                    = ::closewindow;
++    m_dispMap["killwindow"]                     = ::killwindow;
++    m_dispMap["signal"]                         = ::signalactive;
++    m_dispMap["signalwindow"]                   = ::signalwindow;
++    m_dispMap["togglefloating"]                 = ::togglefloating;
++    m_dispMap["setfloating"]                    = ::setfloating;
++    m_dispMap["settiled"]                       = ::settiled;
++    m_dispMap["workspace"]                      = ::workspace;
++    m_dispMap["renameworkspace"]                = ::renameworkspace;
++    m_dispMap["fullscreen"]                     = ::fullscreen;
++    m_dispMap["fullscreenstate"]                = ::fullscreenstate;
++    m_dispMap["movetoworkspace"]                = ::movetoworkspace;
++    m_dispMap["movetoworkspacesilent"]          = ::movetoworkspacesilent;
++    m_dispMap["pseudo"]                         = ::pseudo;
++    m_dispMap["movefocus"]                      = ::movefocus;
++    m_dispMap["movewindow"]                     = ::movewindow;
++    m_dispMap["swapwindow"]                     = ::swapwindow;
++    m_dispMap["centerwindow"]                   = ::centerwindow;
++    m_dispMap["togglegroup"]                    = ::togglegroup;
++    m_dispMap["changegroupactive"]              = ::changegroupactive;
++    m_dispMap["movegroupwindow"]                = ::movegroupwindow;
++    m_dispMap["focusmonitor"]                   = ::focusmonitor;
++    m_dispMap["movecursortocorner"]             = ::movecursortocorner;
++    m_dispMap["movecursor"]                     = ::movecursor;
++    m_dispMap["workspaceopt"]                   = ::workspaceopt;
++    m_dispMap["exit"]                           = ::exitHyprland;
++    m_dispMap["movecurrentworkspacetomonitor"]  = ::movecurrentworkspacetomonitor;
++    m_dispMap["focusworkspaceoncurrentmonitor"] = ::focusworkspaceoncurrentmonitor;
++    m_dispMap["moveworkspacetomonitor"]         = ::moveworkspacetomonitor;
++    m_dispMap["togglespecialworkspace"]         = ::togglespecialworkspace;
++    m_dispMap["forcerendererreload"]            = ::forcerendererreload;
++    m_dispMap["resizeactive"]                   = ::resizeactive;
++    m_dispMap["moveactive"]                     = ::moveactive;
++    m_dispMap["cyclenext"]                      = ::cyclenext;
++    m_dispMap["focuswindowbyclass"]             = ::focuswindow;
++    m_dispMap["focuswindow"]                    = ::focuswindow;
++    m_dispMap["tagwindow"]                      = ::tagwindow;
++    m_dispMap["toggleswallow"]                  = ::toggleswallow;
++    m_dispMap["submap"]                         = ::setsubmap;
++    m_dispMap["pass"]                           = ::passDispatcher;
++    m_dispMap["sendshortcut"]                   = ::sendshortcut;
++    m_dispMap["sendkeystate"]                   = ::sendkeystate;
++    m_dispMap["layoutmsg"]                      = ::layoutmsg;
++    m_dispMap["dpms"]                           = ::dpmsDispatcher;
++    m_dispMap["movewindowpixel"]                = ::movewindowpixel;
++    m_dispMap["resizewindowpixel"]              = ::resizewindowpixel;
++    m_dispMap["swapnext"]                       = ::swapnext;
++    m_dispMap["swapactiveworkspaces"]           = ::swapactiveworkspaces;
++    m_dispMap["pin"]                            = ::pin;
++    m_dispMap["mouse"]                          = ::mouseDispatcher;
++    m_dispMap["bringactivetotop"]               = ::bringactivetotop;
++    m_dispMap["alterzorder"]                    = ::alterzorder;
++    m_dispMap["focusurgentorlast"]              = ::focusurgentorlast;
++    m_dispMap["focuscurrentorlast"]             = ::focuscurrentorlast;
++    m_dispMap["lockgroups"]                     = ::lockgroups;
++    m_dispMap["lockactivegroup"]                = ::lockactivegroup;
++    m_dispMap["moveintogroup"]                  = ::moveintogroup;
++    m_dispMap["moveintoorcreategroup"]          = ::moveintoorcreategroup;
++    m_dispMap["moveoutofgroup"]                 = ::moveoutofgroup;
++    m_dispMap["movewindoworgroup"]              = ::movewindoworgroup;
++    m_dispMap["setignoregrouplock"]             = [](const std::string&) -> SDispatchResult { return {}; }; // deprecated
++    m_dispMap["denywindowfromgroup"]            = ::denywindowfromgroup;
++    m_dispMap["event"]                          = ::eventDispatcher;
++    m_dispMap["global"]                         = ::globalDispatcher;
++    m_dispMap["setprop"]                        = ::setprop;
++    m_dispMap["forceidle"]                      = ::forceidle;
++    m_dispMap["releaseinputcapture"]            = ::releaseInputCapture;
++}
+diff --git a/src/config/legacy/DispatcherTranslator.hpp b/src/config/legacy/DispatcherTranslator.hpp
+new file mode 100644
+index 0000000..e99837f
+--- /dev/null
++++ b/src/config/legacy/DispatcherTranslator.hpp
+@@ -0,0 +1,27 @@
++#pragma once
++
++#include "../../SharedDefs.hpp"
++#include "../../helpers/memory/Memory.hpp"
++
++#include <functional>
++#include <unordered_map>
++#include <string>
++
++namespace Config::Legacy {
++    class CDispatcherTranslator {
++      public:
++        CDispatcherTranslator();
++        ~CDispatcherTranslator() = default;
++
++        SDispatchResult run(const std::string& dispatcher, const std::string& data);
++        // WolOS 0017: whether `dispatcher` is a 0.56 dispatcher name.
++        bool has(const std::string& dispatcher) const {
++            return m_dispMap.contains(dispatcher);
++        }
++
++      private:
++        std::unordered_map<std::string, std::function<SDispatchResult(const std::string&)>> m_dispMap;
++    };
++
++    UP<CDispatcherTranslator>& translator();
++}
+\ No newline at end of file
+diff --git a/src/config/lua/bindings/LuaBindingsToplevel.cpp b/src/config/lua/bindings/LuaBindingsToplevel.cpp
+index c925998..f3f8232 100644
+--- a/src/config/lua/bindings/LuaBindingsToplevel.cpp
++++ b/src/config/lua/bindings/LuaBindingsToplevel.cpp
+@@ -14,6 +14,7 @@
+ #include "../../../plugins/PluginSystem.hpp"
+ #include "../../../keybinds/Manager.hpp"
+ #include "../../../keybinds/Resolver.hpp"
++#include "../../legacy/DispatcherTranslator.hpp"
+ #include "../../../helpers/string/StringUtils.hpp"
+ 
+ #include <hyprutils/string/Numeric.hpp>
+@@ -325,6 +326,21 @@ static int hlClearCrashedLockscreen(lua_State* L) {
+     return 0;
+ }
+ 
++// WolOS 0017: a 0.56 dispatcher by name (`hyprctl keyword bind…` binds call it). true, or false and the error.
++static int hlLegacyDispatch(lua_State* L) {
++    const std::string NAME = luaL_checkstring(L, 1);
++    const std::string ARG  = luaL_optstring(L, 2, "");
++    if (!Config::Legacy::translator()->has(NAME)) {
++        lua_pushboolean(L, false);
++        lua_pushstring(L, std::format("legacy_dispatch: no dispatcher {}", NAME).c_str());
++        return 2;
++    }
++    const auto RES = Config::Legacy::translator()->run(NAME, ARG);
++    lua_pushboolean(L, RES.success);
++    lua_pushstring(L, RES.error.c_str());
++    return 2;
++}
++
+ static int hlDispatch(lua_State* L) {
+     if (const auto result = Internal::pushDispatcherFunction(L, 1); !result)
+         return Internal::configError(L, std::format("hl.dispatch: {}", result.error()));
+@@ -474,6 +490,7 @@ void Internal::registerToplevelBindings(lua_State* L, CConfigManager* mgr) {
+     Internal::setMgrFn(L, mgr, "timer", hlTimer);
+ 
+     Internal::setFn(L, "dispatch", hlDispatch);
++    Internal::setFn(L, "legacy_dispatch", hlLegacyDispatch);
+     Internal::setFn(L, "version", hlVersion);
+     Internal::setFn(L, "get_loaded_plugins", hlGetPlugins);
+     Internal::setFn(L, "exec_cmd", hlExecCmd);
+diff --git a/src/helpers/WolosCompat.hpp b/src/helpers/WolosCompat.hpp
+new file mode 100644
+index 0000000..ffe3c79
+--- /dev/null
++++ b/src/helpers/WolosCompat.hpp
+@@ -0,0 +1,244 @@
++#pragma once
++
++// WolOS compatibility layer (patch 0017): the 0.56 IPC forms the WolOS tools send, on the 0.57 Lua
++// configuration. `hyprctl keyword NAME VALUE` becomes one Lua chunk run like `hyprctl eval`;
++// `hyprctl dispatch NAME ARGS` with a 0.56 dispatcher name runs that dispatcher. Pure functions:
++// tested in tests/helpers/WolosCompat.cpp.
++
++#include <cctype>
++#include <cstdint>
++#include <format>
++#include <optional>
++#include <string>
++#include <string_view>
++#include <vector>
++
++namespace WolosCompat {
++    inline std::string_view trim(std::string_view s) {
++        while (!s.empty() && std::isspace((unsigned char)s.front()))
++            s.remove_prefix(1);
++        while (!s.empty() && std::isspace((unsigned char)s.back()))
++            s.remove_suffix(1);
++        return s;
++    }
++
++    // A Lua string literal: double quotes, `\`, `"` and control characters escaped.
++    inline std::string luaStr(std::string_view s) {
++        std::string out = "\"";
++        for (const char c : s) {
++            if (c == '\\')
++                out += "\\\\";
++            else if (c == '"')
++                out += "\\\"";
++            else if (c == '\n')
++                out += "\\n";
++            else if ((unsigned char)c < 0x20 || c == 0x7f)
++                out += std::format("\\{:03}", (int)(unsigned char)c);
++            else
++                out += c;
++        }
++        return out + "\"";
++    }
++
++    // A decimal number as Lua reads it (digits, one leading '-', one '.'): not "1e3", "inf", "0x10".
++    inline bool isPlainNumber(std::string_view s) {
++        if (!s.empty() && s.front() == '-')
++            s.remove_prefix(1);
++        if (s.empty() || s.front() == '.' || s.back() == '.')
++            return false;
++        int dots = 0;
++        for (const char c : s) {
++            if (c == '.')
++                dots++;
++            else if (!std::isdigit((unsigned char)c))
++                return false;
++        }
++        return dots <= 1;
++    }
++
++    // The literal an option of any type takes: true/false, a number, a gradient table
++    // (`rgba(..) rgba(..) 45deg`) or a string (colours, vectors "0 8", names).
++    inline std::string luaValue(std::string_view raw) {
++        const auto v = trim(raw);
++        if (v == "true" || v == "false" || isPlainNumber(v))
++            return std::string{v};
++        // gradient: two or more colours, an optional angle
++        std::vector<std::string_view> parts;
++        size_t                        i = 0;
++        while (i < v.size()) {
++            const auto j = v.find(' ', i);
++            const auto p = v.substr(i, j == std::string_view::npos ? std::string_view::npos : j - i);
++            if (!p.empty())
++                parts.push_back(p);
++            if (j == std::string_view::npos)
++                break;
++            i = j + 1;
++        }
++        bool gradient = parts.size() > 1;
++        for (const auto& p : parts)
++            gradient = gradient && (p.starts_with("rgb") || p.starts_with("0x") || p.ends_with("deg"));
++        if (gradient) {
++            std::string colors, angle;
++            for (const auto& p : parts) {
++                if (p.ends_with("deg"))
++                    angle = std::format(", angle = {}", p.substr(0, p.size() - 3));
++                else
++                    colors += (colors.empty() ? "" : ", ") + luaStr(p);
++            }
++            return std::format("{{ colors = {{ {} }}{} }}", colors, angle);
++        }
++        return luaStr(v);
++    }
++
++    // "SUPER SHIFT", "SUPER_SHIFT" or "SUPERSHIFT" and a key as `hl.bind` reads them: "SUPER + SHIFT + Z".
++    inline std::string bindKeys(std::string_view mods, std::string_view key) {
++        static constexpr std::string_view NAMES[] = {"SUPER", "SHIFT", "CTRL", "CONTROL", "ALT", "MOD2", "MOD3", "MOD5", "META", "WIN", "LOGO", "MOD4", "MOD1", "CAPS"};
++        std::string                       out;
++        std::string                       up;
++        for (const char c : mods)
++            up += (char)std::toupper((unsigned char)c);
++        size_t i = 0;
++        while (i < up.size()) {
++            if (up[i] == ' ' || up[i] == '_' || up[i] == '+') {
++                i++;
++                continue;
++            }
++            bool hit = false;
++            for (const auto n : NAMES) {
++                if (std::string_view{up}.substr(i).starts_with(n)) {
++                    out += std::string{n} + " + ";
++                    i += n.size();
++                    hit = true;
++                    break;
++                }
++            }
++            if (!hit)
++                return {}; // not a modifier list
++        }
++        return out + std::string{trim(key)};
++    }
++
++    // Splits "a, b, c, rest, with, commas" into at most `n` fields (the last keeps its commas).
++    inline std::vector<std::string> fields(std::string_view s, size_t n) {
++        std::vector<std::string> out;
++        while (out.size() + 1 < n) {
++            const auto c = s.find(',');
++            if (c == std::string_view::npos)
++                break;
++            out.emplace_back(trim(s.substr(0, c)));
++            s.remove_prefix(c + 1);
++        }
++        out.emplace_back(trim(s));
++        return out;
++    }
++
++    // `bind` flag letters as hl.bind options.
++    inline std::optional<std::string> bindOptions(std::string_view flags) {
++        std::string out;
++        for (const char c : flags) {
++            const char* opt = nullptr;
++            switch (c) {
++                case 'e': opt = "repeating"; break;
++                case 'l': opt = "locked"; break;
++                case 'r': opt = "release"; break;
++                case 'n': opt = "non_consuming"; break;
++                case 'm': opt = "mouse"; break;
++                case 't': opt = "transparent"; break;
++                case 'i': opt = "ignore_mods"; break;
++                case 'o': opt = "long_press"; break;
++                default: return std::nullopt; // `d` (description) and others: not kept
++            }
++            out += std::format("{}{} = true", out.empty() ? "" : ", ", opt);
++        }
++        return out;
++    }
++
++    // `hyprctl keyword NAME VALUE` as one Lua chunk; nullopt when it has no Lua form here.
++    inline std::optional<std::string> keywordToLua(std::string_view name, std::string_view value) {
++        name  = trim(name);
++        value = trim(value);
++        if (name.starts_with("bind")) {
++            const auto flags = name.substr(4);
++            for (const char c : flags)
++                if (!std::islower((unsigned char)c))
++                    return std::nullopt;
++            const auto opts = bindOptions(flags);
++            const auto f    = fields(value, 4);
++            if (!opts || f.size() < 3)
++                return std::nullopt;
++            const auto keys = bindKeys(f[0], f[1]);
++            if (keys.empty() && !trim(f[0]).empty())
++                return std::nullopt;
++            const std::string KEYS = luaStr(keys.empty() ? f[1] : keys);
++            const std::string ARG  = f.size() > 3 ? f[3] : "";
++            std::string       action;
++            if (flags.find('m') != std::string_view::npos && f[2] == "movewindow")
++                action = "hl.dsp.window.drag()";
++            else if (flags.find('m') != std::string_view::npos && f[2] == "resizewindow")
++                action = "hl.dsp.window.resize()";
++            else
++                action = std::format("function() hl.legacy_dispatch({}, {}) end", luaStr(f[2]), luaStr(ARG));
++            return opts->empty() ? std::format("hl.bind({}, {})", KEYS, action) : std::format("hl.bind({}, {}, {{ {} }})", KEYS, action, *opts);
++        }
++        if (name == "unbind") {
++            const auto f    = fields(value, 2);
++            const auto keys = f.size() == 2 ? bindKeys(f[0], f[1]) : std::string{};
++            if (f.size() != 2 || (keys.empty() && !trim(f[0]).empty()))
++                return std::nullopt;
++            return std::format("hl.unbind({})", luaStr(keys.empty() ? f[1] : keys));
++        }
++        if (name == "animation") {
++            const auto f = fields(value, 5);
++            if (f.size() < 2)
++                return std::nullopt;
++            std::string s = std::format("hl.animation({{ leaf = {}, enabled = {}", luaStr(f[0]), f[1] == "1" ? "true" : "false");
++            if (f.size() > 2)
++                s += std::format(", speed = {}", luaValue(f[2]));
++            if (f.size() > 3)
++                s += std::format(", bezier = {}", luaStr(f[3]));
++            if (f.size() > 4)
++                s += std::format(", style = {}", luaStr(f[4]));
++            return s + " })";
++        }
++        if (name.starts_with("windowrule[") || name.starts_with("layerrule[")) {
++            const bool window = name.starts_with("windowrule[");
++            const auto close  = name.find("]:");
++            const auto open   = name.find('[');
++            if (close == std::string_view::npos)
++                return std::nullopt;
++            const auto rule = name.substr(open + 1, close - open - 1);
++            const auto prop = name.substr(close + 2);
++            const auto fn   = window ? "hl.window_rule" : "hl.layer_rule";
++            if (prop == "enable" || prop == "enabled")
++                return std::format("{}({{ name = {}, enabled = {} }})", fn, luaStr(rule), value == "true" || value == "1" ? "true" : "false");
++            if (prop.starts_with("match:"))
++                return std::format("{}({{ name = {}, match = {{ [{}] = {} }} }})", fn, luaStr(rule), luaStr(prop.substr(6)), luaStr(value));
++            return std::format("{}({{ name = {}, [{}] = {} }})", fn, luaStr(rule), luaStr(prop), luaValue(value));
++        }
++        if (name.empty() || name.find_first_of(" (){}[]\"'=") != std::string_view::npos)
++            return std::nullopt;
++        std::string key{name};
++        for (auto& c : key) {
++            if (c == ':')
++                c = '.';
++            else if (c == '-')
++                c = '_';
++        }
++        return std::format("hl.config({{ [{}] = {} }})", luaStr(key), luaValue(value));
++    }
++
++    // `hyprctl dispatch` text: the 0.56 form (a dispatcher name, then its argument) when the first
++    // word is one, else Lua (`hl.dsp.…`, a function).
++    struct SLegacyDispatch {
++        std::string name, arg;
++    };
++    template <typename KNOWN>
++    inline std::optional<SLegacyDispatch> legacyDispatch(std::string_view in, KNOWN&& known) {
++        in               = trim(in);
++        const auto SPACE = in.find(' ');
++        const auto NAME  = in.substr(0, SPACE);
++        if (NAME.empty() || NAME.find_first_of("().{}\"'") != std::string_view::npos || !known(std::string{NAME}))
++            return std::nullopt;
++        return SLegacyDispatch{std::string{NAME}, SPACE == std::string_view::npos ? std::string{} : std::string{trim(in.substr(SPACE + 1))}};
++    }
++}
+diff --git a/src/ipc/s1/Commands.cpp b/src/ipc/s1/Commands.cpp
+index fb12ee2..5bd30db 100644
+--- a/src/ipc/s1/Commands.cpp
++++ b/src/ipc/s1/Commands.cpp
+@@ -77,6 +77,8 @@ using namespace Hyprutils::String;
+ #include "../../layout/algorithm/Algorithm.hpp"
+ #include "../../layout/algorithm/TiledAlgorithm.hpp"
+ #include "../../layout/supplementary/WorkspaceAlgoMatcher.hpp"
++#include "../../config/legacy/DispatcherTranslator.hpp"
++#include "../../helpers/WolosCompat.hpp"
+ 
+ using namespace Render::GL;
+ using namespace IPC::Socket1;
+@@ -1333,6 +1335,12 @@ static std::string dispatchRequest(eHyprCtlOutputFormat format, std::string in)
+     // get rid of the dispatch keyword
+     in = in.substr(in.find_first_of(' ') + 1);
+ 
++    // WolOS 0017: the 0.56 form `dispatch NAME ARGS` the WolOS tools send runs that dispatcher.
++    if (const auto LEGACY = WolosCompat::legacyDispatch(in, [](const std::string& n) { return Config::Legacy::translator()->has(n); })) {
++        const auto RES = Config::Legacy::translator()->run(LEGACY->name, LEGACY->arg);
++        return RES.success ? "ok" : RES.error;
++    }
++
+     if (Config::mgr()->type() == Config::CONFIG_LUA) {
+         // For lua, this is just a wrapper for `eval("hl.dispatch(in)")
+         std::string evalStr = std::format("return hl.dispatch({})", in);
+@@ -1349,6 +1357,25 @@ static std::string dispatchRequest(eHyprCtlOutputFormat format, std::string in)
+     return "current config provider doesn't support dispatch";
+ }
+ 
++// WolOS 0017: `keyword NAME VALUE` (0.56) as the Lua call it means, run like `eval`.
++static std::string keywordRequest(eHyprCtlOutputFormat format, std::string in) {
++    if (Config::mgr()->type() != Config::CONFIG_LUA)
++        return "keyword is only supported with the lua config manager";
++
++    in               = in.substr(in.find_first_of(' ') + 1);
++    const auto SPACE = in.find_first_of(' ');
++    const auto NAME  = in.substr(0, SPACE);
++    const auto VALUE = SPACE == std::string::npos ? std::string{} : in.substr(SPACE + 1);
++    const auto LUA   = WolosCompat::keywordToLua(NAME, VALUE);
++    if (!LUA)
++        return std::format("keyword: {} has no Lua form", NAME);
++
++    auto luaMgr = dynamicPointerCast<Config::Lua::CConfigManager>(WP<Config::IConfigManager>(Config::mgr()));
++    if (const auto ERR = luaMgr->eval(*LUA))
++        return *ERR;
++    return "ok";
++}
++
+ static std::string reloadRequest(eHyprCtlOutputFormat format, std::string request) {
+ 
+     if (request.ends_with("full-reset")) {
+@@ -2119,6 +2146,7 @@ void IPC::Socket1::registerBuiltinCommands(CSocket1& socket) {
+     socket.registerCommand(legacyCommand("switchxkblayout", COMMAND_MATCH_PREFIX, switchXKBLayoutRequest));
+     socket.registerCommand(legacyCommand("output", COMMAND_MATCH_PREFIX, dispatchOutput));
+     socket.registerCommand(legacyCommand("dispatch", COMMAND_MATCH_PREFIX, dispatchRequest));
++    socket.registerCommand(legacyCommand("keyword", COMMAND_MATCH_PREFIX, keywordRequest));
+     socket.registerCommand(legacyCommand("setcursor", COMMAND_MATCH_PREFIX, dispatchSetCursor));
+     socket.registerCommand(legacyCommand("getoption", COMMAND_MATCH_PREFIX, dispatchGetOption));
+     socket.registerCommand(legacyCommand("decorations", COMMAND_MATCH_PREFIX, decorationRequest));
+diff --git a/tests/helpers/WolosCompat.cpp b/tests/helpers/WolosCompat.cpp
+new file mode 100644
+index 0000000..532ffcf
+--- /dev/null
++++ b/tests/helpers/WolosCompat.cpp
+@@ -0,0 +1,58 @@
++#include <helpers/WolosCompat.hpp>
++
++#include <gtest/gtest.h>
++
++using namespace WolosCompat;
++
++TEST(WolosCompat, optionsBecomeTypedConfigCalls) {
++    EXPECT_EQ(*keywordToLua("decoration:rounding", "4"), R"lua(hl.config({ ["decoration.rounding"] = 4 }))lua");
++    EXPECT_EQ(*keywordToLua("decoration:blur:enabled", "false"), R"lua(hl.config({ ["decoration.blur.enabled"] = false }))lua");
++    EXPECT_EQ(*keywordToLua("cursor:zoom_factor", "3.000000"), R"lua(hl.config({ ["cursor.zoom_factor"] = 3.000000 }))lua");
++    EXPECT_EQ(*keywordToLua("plugin:hyprbars:bar_color", "rgba(112233e6)"), R"lua(hl.config({ ["plugin.hyprbars.bar_color"] = "rgba(112233e6)" }))lua");
++    EXPECT_EQ(*keywordToLua("plugin:hyprbars:col.text", "rgba(4c4f69ff)"), R"lua(hl.config({ ["plugin.hyprbars.col.text"] = "rgba(4c4f69ff)" }))lua");
++    EXPECT_EQ(*keywordToLua("input:kb_variant", ""), R"lua(hl.config({ ["input.kb_variant"] = "" }))lua");
++    EXPECT_EQ(*keywordToLua("input:touchpad:tap-to-click", "true"), R"lua(hl.config({ ["input.touchpad.tap_to_click"] = true }))lua");
++    EXPECT_EQ(*keywordToLua("general:col.active_border", "rgba(33ccffff) rgba(00ff99ee) 45deg"),
++              R"lua(hl.config({ ["general.col.active_border"] = { colors = { "rgba(33ccffff)", "rgba(00ff99ee)" }, angle = 45 } }))lua");
++    EXPECT_EQ(*keywordToLua("decoration:shadow:offset", "0 8"), R"lua(hl.config({ ["decoration.shadow.offset"] = "0 8" }))lua");
++    EXPECT_EQ(luaValue("1e3"), R"lua("1e3")lua");
++    EXPECT_EQ(luaValue("-40"), "-40");
++    EXPECT_EQ(luaStr("a\"b\\c\nd"), R"lua("a\"b\\c\nd")lua");
++    EXPECT_FALSE(keywordToLua("hl.config({})", "x").has_value());
++}
++
++TEST(WolosCompat, bindsCallTheLegacyDispatcher) {
++    EXPECT_EQ(*keywordToLua("bind", "SUPER,Space,exec,foot"), R"lua(hl.bind("SUPER + Space", function() hl.legacy_dispatch("exec", "foot") end))lua");
++    EXPECT_EQ(*keywordToLua("binde", "SUPER CTRL,left,resizeactive,-40 0"),
++              R"lua(hl.bind("SUPER + CTRL + left", function() hl.legacy_dispatch("resizeactive", "-40 0") end, { repeating = true }))lua");
++    EXPECT_EQ(*keywordToLua("bindrt", "SUPER, SUPER_R, exec, wol shell hide switcher"),
++              R"lua(hl.bind("SUPER + SUPER_R", function() hl.legacy_dispatch("exec", "wol shell hide switcher") end, { release = true, transparent = true }))lua");
++    EXPECT_EQ(*keywordToLua("bindn", ", Escape, exec, wol shell hide transient"),
++              R"lua(hl.bind("Escape", function() hl.legacy_dispatch("exec", "wol shell hide transient") end, { non_consuming = true }))lua");
++    EXPECT_EQ(*keywordToLua("bind", "SUPER ALT,left,movefocus,l"), R"lua(hl.bind("SUPER + ALT + left", function() hl.legacy_dispatch("movefocus", "l") end))lua");
++    EXPECT_EQ(*keywordToLua("bind", "SUPERSHIFT, K, exec, a, b"), R"lua(hl.bind("SUPER + SHIFT + K", function() hl.legacy_dispatch("exec", "a, b") end))lua");
++    EXPECT_EQ(*keywordToLua("bindm", "SUPER, mouse:272, movewindow"), R"lua(hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true }))lua");
++    EXPECT_EQ(*keywordToLua("unbind", "SUPER ALT,left"), R"lua(hl.unbind("SUPER + ALT + left"))lua");
++    EXPECT_FALSE(keywordToLua("bindd", "SUPER, Q, Quit, exec, x").has_value());
++    EXPECT_FALSE(keywordToLua("bind", "SUPER").has_value());
++}
++
++TEST(WolosCompat, animationsAndNamedRules) {
++    EXPECT_EQ(*keywordToLua("animation", "windowsIn,1,4.4,wolOut,popin 90%"),
++              R"lua(hl.animation({ leaf = "windowsIn", enabled = true, speed = 4.4, bezier = "wolOut", style = "popin 90%" }))lua");
++    EXPECT_EQ(*keywordToLua("windowrule[wol-float]:enable", "false"), R"lua(hl.window_rule({ name = "wol-float", enabled = false }))lua");
++    EXPECT_EQ(*keywordToLua("windowrule[wol-float-apps]:match:class", "^(mpv)$"), R"lua(hl.window_rule({ name = "wol-float-apps", match = { ["class"] = "^(mpv)$" } }))lua");
++}
++
++TEST(WolosCompat, dispatchTellsLegacyFromLua) {
++    auto known = [](const std::string& n) { return n == "exec" || n == "workspace" || n == "closewindow" || n == "exit"; };
++    auto d     = legacyDispatch("exec pgrep -x wol-lock || wol-lock", known);
++    ASSERT_TRUE(d.has_value());
++    EXPECT_EQ(d->name, "exec");
++    EXPECT_EQ(d->arg, "pgrep -x wol-lock || wol-lock");
++    EXPECT_EQ(legacyDispatch("workspace 3", known)->arg, "3");
++    EXPECT_EQ(legacyDispatch("exit", known)->arg, "");
++    EXPECT_FALSE(legacyDispatch("hl.dsp.exit()", known).has_value());
++    EXPECT_FALSE(legacyDispatch("hl.dsp.exec_cmd(\"foot\")", known).has_value());
++    EXPECT_FALSE(legacyDispatch("nosuch 1", known).has_value());
++}
