@@ -80,7 +80,7 @@ jobs:
           mkdir -p out/testing
           gh release download wolos-testing --dir out/testing --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig' \
             --pattern 'inputs.json' --pattern '*.inputs.json'
-          ls out/testing | tee -a "$GITHUB_STEP_SUMMARY"
+          find out/testing -maxdepth 1 -type f -printf '%f\n' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Sign, index, upload to [wolos], CDN
         env:
           GPG_KEY: ${{ secrets.WOLOS_GPG_KEY }}
@@ -90,6 +90,7 @@ jobs:
           # Hand mode (no releases token): wolos-build records the release writes instead of running them.
           [ "$UPLOAD" = 1 ] || export WOLOS_GH_RECORD=$PWD/out/gh-release.sh
           echo "STAGE=$PWD/out/work/publish/wolos-$(tr -d '[:space:]' < wolos-pkgbuilds/snapshot)" >> "$GITHUB_ENV"
+          # shellcheck disable=SC2016 # single quotes on purpose: the builder's own bash expands these
           wolos-pkgbuilds/.github/builder bash -euo pipefail -c '
               echo "$GPG_KEY" | gpg --batch --import
               export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")

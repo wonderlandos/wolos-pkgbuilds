@@ -7,6 +7,7 @@ tagged together (wolos ADR 0029).
 ## 0.12.0 (unreleased)
 
 Recipes
+- `linux-wolos` 1:1.0+7.3-5 (pkgrel 5) rebuilds the same fork tag `wolkernel-1.0-7.3` (sha256 unchanged); `linux-wolos-api-headers` stays at -4.
 - Optional modules as meta packages: `wolos-module-ai-claude`, `-ai-local`, `-ai-sessions`, `-console`, `-creative`, `-dev` and `-gaming` (depends only, `arch=any`). `wolos-module-ai-local` turns on its local AI service; `wolos-module-ai-claude` installs the WolOS managed settings for Claude Code, so they no longer ship with every system.
 - `wolos-hue`: the `wol-hue` theme tool, with its third-party notice.
 - `wolos-system` installs `THIRD-PARTY.md` under `/usr/share/licenses/wolos-system/` and keeps more of its `/etc` files on upgrade (`backup=`).

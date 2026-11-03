@@ -96,6 +96,10 @@ fn tmp_clean(d: &Path) -> bool {
     fs::read_dir(d.join("tmp")).unwrap().next().is_none()
 }
 
+/// A fake `ip` for `ip -4|-6 route show default`: a route on -4 only, or none at all.
+const IP_ONLINE: &str = "case \"$*\" in *-4*) echo 'default via 10.0.2.2 dev eth0' ;; esac";
+const IP_OFFLINE: &str = "exit 0";
+
 /// A registry with three records and the fakes modules-install calls.
 fn modules_box(name: &str, pacman_fails_for: &str) -> PathBuf {
     let d = sandbox(
@@ -116,6 +120,8 @@ fn modules_box(name: &str, pacman_fails_for: &str) -> PathBuf {
                 "echo \"wol $*\" >> \"$LOG\"; echo '{\"backend\": \"cuda\", \"vram_mb\": 8192, \"gpu\": \"x\"}'",
             ),
             ("logger", "exit 0"),
+            // A default route: the machine is online unless a test says otherwise (audit I6-3).
+            ("ip", IP_ONLINE),
         ],
     );
     // The slot's package database (read-only on a sealed slot): `local` and `sync`.
@@ -293,6 +299,74 @@ fn modules_install_installs_queues_and_drains() {
     assert!(run(s, &d, &menv(&d), &["--drain"]).status.success());
 }
 
+/// audit6 I6-3: offline, a failed drain is no try. A laptop installed offline and used offline
+/// for five boots keeps its modules queued; the tries start when a route exists.
+#[test]
+fn offline_drains_are_not_tries_online_ones_are() {
+    let s = "files/usr/lib/wolos/modules-install";
+    let d = modules_box("offline", "wolos-module-creative");
+    fs::create_dir_all(d.join("state")).unwrap();
+    fs::write(d.join("bin/ip"), format!("#!/bin/sh\n{IP_OFFLINE}\n")).unwrap();
+    fs::write(d.join("state/modules-pending"), "creative\n").unwrap();
+    fs::write(d.join("state/packages-pending"), "flac\n").unwrap();
+    fs::write(
+        d.join("bin/pacman"),
+        "#!/bin/sh\necho \"pacman $*\" >> \"$LOG\"\nexit 1\n",
+    )
+    .unwrap();
+    // Six offline drains (the limit is five): every one fails, nothing is counted or given up.
+    for n in 1..=6 {
+        let o = run(s, &d, &menv(&d), &["--drain"]);
+        assert_eq!(o.status.code(), Some(1), "drain {n}");
+        assert_eq!(pending(&d).as_deref(), Some("creative\n"), "drain {n}");
+        assert_eq!(pkg_pending(&d).as_deref(), Some("flac\n"), "drain {n}");
+        assert!(
+            !d.join("state/modules-attempts").exists(),
+            "drain {n} counted a try offline"
+        );
+        assert!(!d.join("state/modules-gave-up").exists(), "drain {n}");
+    }
+    assert!(
+        String::from_utf8_lossy(&run(s, &d, &menv(&d), &["--drain"]).stderr).contains("no network"),
+        "says why nothing was counted"
+    );
+    // Tries counted before stay as they are, offline.
+    fs::write(d.join("state/modules-attempts"), "m creative 4\np flac 2\n").unwrap();
+    run(s, &d, &menv(&d), &["--drain"]);
+    assert_eq!(
+        fs::read_to_string(d.join("state/modules-attempts")).unwrap(),
+        "m creative 4\np flac 2\n"
+    );
+    // The route comes up: the same failure now counts, and the fifth try gives up.
+    fs::write(d.join("bin/ip"), format!("#!/bin/sh\n{IP_ONLINE}\n")).unwrap();
+    run(s, &d, &menv(&d), &["--drain"]);
+    let gave = fs::read_to_string(d.join("state/modules-gave-up")).unwrap_or_default();
+    assert_eq!(gave, "m creative\n", "the fifth counted try gives up");
+    assert_eq!(pending(&d), None);
+    assert_eq!(pkg_pending(&d).as_deref(), Some("flac\n"));
+    assert_eq!(
+        fs::read_to_string(d.join("state/modules-attempts")).unwrap_or_default(),
+        "p flac 3\n",
+        "flac had 2 tries, now 3"
+    );
+    // A v6-only route counts as online too.
+    let d = modules_box("v6", "wolos-module-creative");
+    fs::create_dir_all(d.join("state")).unwrap();
+    fs::write(
+        d.join("bin/ip"),
+        "#!/bin/sh\ncase \"$*\" in *-6*) echo 'default via fe80::1 dev wlan0' ;; esac\n",
+    )
+    .unwrap();
+    fs::write(d.join("state/modules-pending"), "creative\n").unwrap();
+    let o = run(s, &d, &menv(&d), &["--drain"]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(
+        fs::read_to_string(d.join("state/modules-attempts"))
+            .unwrap()
+            .contains("m creative 1\n")
+    );
+}
+
 #[test]
 fn firstboot_hands_queued_modules_to_their_own_unit() {
     header_ok_firstboot();
@@ -342,6 +416,12 @@ fn firstboot_hands_queued_modules_to_their_own_unit() {
             && l.contains("/usr/lib/wolos/modules-install --drain"),
         "{l}"
     );
+    // ST6-2: a failed transient unit stays loaded and its name stays taken, so the drain unit is
+    // collected whatever its end, and "something stays queued" (exit 1) is not a failure.
+    assert!(
+        l.contains(" --collect ") && l.contains("--property=SuccessExitStatus=1"),
+        "{l}"
+    );
     assert!(
         st.join("firstboot-done").exists(),
         "the queue does not hold firstboot"
@@ -360,6 +440,12 @@ fn firstboot_hands_queued_modules_to_their_own_unit() {
     assert!(
         l.contains("systemd-run --no-block --unit=wolos-modules-pending")
             && l.contains("/usr/lib/wolos/modules-install --drain"),
+        "{l}"
+    );
+    // ST6-2: a failed transient unit stays loaded and its name stays taken, so the drain unit is
+    // collected whatever its end, and "something stays queued" (exit 1) is not a failure.
+    assert!(
+        l.contains(" --collect ") && l.contains("--property=SuccessExitStatus=1"),
         "{l}"
     );
     assert!(st.join("firstboot-done").exists());

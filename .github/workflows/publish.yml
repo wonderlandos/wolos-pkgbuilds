@@ -125,6 +125,7 @@ jobs:
           export WOLOS_SUMMARY=$PWD/out/summary.md
           # Hand mode (no releases token): wolos-build records the release writes instead of running them.
           [ "$UPLOAD" = 1 ] || export WOLOS_GH_RECORD=$PWD/out/gh-release.sh
+          # shellcheck disable=SC2016 # single quotes on purpose: the builder's own bash expands these
           tool/builder bash -euo pipefail -c '
               echo "$GPG_KEY" | gpg --batch --import
               export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")
