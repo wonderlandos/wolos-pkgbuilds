@@ -17,6 +17,7 @@ libwol         libwol               -                                       libw
 libwolkit      libwolkit            -                                       libwolkit/
 cryswol        cryswol              libwol                                  cryswol/
 wolkit         wolkit               libwolkit,libwol,cryswol                wolkit/
+wolos-crystal  wolos-crystal        libwol,libwolkit,cryswol,wolkit         wolos-crystal/
 wolos-hue      wolos-hue            -                                       wolos-hue/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/

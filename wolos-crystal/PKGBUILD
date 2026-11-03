@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-crystal: the WolOS Crystal tools as one package (wolos docs/RULES-crystal.md RCR-050 to
+# RCR-053, wolos-crystal/skill/SKILL.md). A meta package for the toolchain and the two shards
+# (crystal, shards, libwol, libwolkit, cryswol, wolkit; the app template comes with wolkit) that
+# also installs what `wol app new` needs beyond them: the cli, tool and ai templates under
+# /usr/share/wolos/templates, the Crystal app skill under /usr/share/wolos/crystal/skill, and the
+# CRYSTAL_PATH that makes `require "wolkit"` work in a login shell. check() renders the templates the
+# way `wol app new` does and runs their specs.
+pkgname=wolos-crystal
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Crystal tools: compiler, shards, libwol, libwolkit, the app templates and the app skill'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+# The templates are BSD-2-Clause (a new project may take any licence); the skill is GPL-2.0-or-later.
+license=(GPL-2.0-or-later BSD-2-Clause)
+depends=(crystal shards make pkgconf libwol libwolkit cryswol wolkit)
+makedepends=(git)
+options=(!debug)
+backup=(etc/profile.d/wolos-crystal.sh)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). Templates and the skill
+# are plain files: no submodule is needed.
+_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+# The templates this package installs (app is the wolkit package's).
+_templates=(cli tool ai)
+
+# Write template $1 as project "demo" into $2: a .tmpl file loses the suffix and gets {{id}},
+# {{name}} and {{module}} filled, in its name and its text (what `wol app new demo` does).
+_render() {
+  local from="$srcdir/wolos/wolos-crystal/templates/$1" to=$2 f rel out
+  while IFS= read -r -d '' f; do
+    rel=${f#"$from"/}
+    out=$to/${rel//\{\{name\}\}/demo}
+    out=${out%.tmpl}
+    install -d "$(dirname "$out")"
+    sed -e 's/{{id}}/org.wolos.demo/g' -e 's/{{name}}/demo/g' -e 's/{{module}}/Demo/g' "$f" > "$out"
+  done < <(find "$from" -type f -print0)
+}
+
+check() {
+  export CRYSTAL_PATH="lib:/usr/lib/wolos/crystal:$(crystal env CRYSTAL_PATH | sed 's/^lib://')"
+  local t
+  for t in "${_templates[@]}"; do
+    _render "$t" "$srcdir/check/$t"
+    (
+      cd "$srcdir/check/$t"
+      crystal tool format --check src spec
+      crystal spec --error-on-warnings
+      shards build --frozen --local --error-on-warnings
+    )
+  done
+}
+
+package() {
+  cd "$srcdir/wolos"
+  local t
+  for t in "${_templates[@]}"; do
+    install -d "$pkgdir/usr/share/wolos/templates/$t"
+    cp -r "wolos-crystal/templates/$t/." "$pkgdir/usr/share/wolos/templates/$t/"
+  done
+  find "$pkgdir/usr/share/wolos/templates" -type d -exec chmod 755 {} +
+  find "$pkgdir/usr/share/wolos/templates" -type f -exec chmod 644 {} +
+  install -Dm644 wolos-crystal/skill/SKILL.md "$pkgdir/usr/share/wolos/crystal/skill/SKILL.md"
+  # A project's own shards (lib, from `shards install`), then the system shards, then the standard
+  # library; a CRYSTAL_PATH the person set stays.
+  install -Dm644 /dev/stdin "$pkgdir/etc/profile.d/wolos-crystal.sh" <<'SH'
+# CRYSTAL_PATH for the WolOS Crystal tools (wolos-crystal): the project's shards, the system shards.
+[ -n "${CRYSTAL_PATH:-}" ] || export CRYSTAL_PATH=lib:/usr/lib/wolos/crystal:/usr/lib/crystal
+SH
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_conf.d/wolos-crystal.fish" <<'FISH'
+# CRYSTAL_PATH for the WolOS Crystal tools (wolos-crystal): the project's shards, the system shards.
+set -q CRYSTAL_PATH; or set -gx CRYSTAL_PATH lib:/usr/lib/wolos/crystal:/usr/lib/crystal
+FISH
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

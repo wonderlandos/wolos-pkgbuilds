@@ -16,7 +16,7 @@ arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(wolos-system git github-cli mise code lazygit btop zellij podman jq
-  ttf-jetbrains-mono-nerd crystal pkgconf libwol cryswol)
+  ttf-jetbrains-mono-nerd crystal pkgconf libwol cryswol wolos-crystal)
 
 package() {
   # Nothing to install: the dependencies are the module.

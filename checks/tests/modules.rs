@@ -151,16 +151,18 @@ fn wolos_packages() -> Vec<String> {
 /// Crystal is the userland language and Cryswol its framework (ADR 0036): the developer module
 /// brings the compiler (with pkgconf), libwol.so.1 and the shard under
 /// /usr/lib/wolos/crystal/cryswol, so a `require "cryswol"` program builds and runs on an installed
-/// system (the image does not ship them). libwol and cryswol come from [wolos]; no other module depends on a [wolos] package.
+/// system (the image does not ship them), plus wolos-crystal (the wolkit shard, libwolkit, the
+/// `wol app new` templates and the app skill). libwol, cryswol and wolos-crystal come from [wolos];
+/// no other module depends on a [wolos] package.
 #[test]
 fn dev_module_brings_the_crystal_runtime() {
     let deps = pkgvar("wolos-module-dev", "depends");
     // pkgconf: `crystal build` asks pkg-config for the libraries a shard links.
-    for p in ["crystal", "pkgconf", "libwol", "cryswol"] {
+    for p in ["crystal", "pkgconf", "libwol", "cryswol", "wolos-crystal"] {
         assert!(deps.iter().any(|d| d == p), "wolos-module-dev lacks {p}");
     }
     let ours = wolos_packages();
-    for p in ["libwol", "cryswol"] {
+    for p in ["libwol", "cryswol", "wolos-crystal"] {
         assert!(ours.iter().any(|o| o == p), "{p} is not a [wolos] package");
     }
     // The shard's recipe still pulls the runtime it links.
@@ -171,7 +173,7 @@ fn dev_module_brings_the_crystal_runtime() {
         for d in pkgvar(&dir, "depends") {
             if d != "wolos-system" && ours.contains(&d) {
                 assert!(
-                    id == "dev" && (d == "libwol" || d == "cryswol"),
+                    id == "dev" && ["libwol", "cryswol", "wolos-crystal"].contains(&d.as_str()),
                     "{dir}: [wolos] dependency {d}"
                 );
             }
