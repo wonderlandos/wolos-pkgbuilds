@@ -14,6 +14,8 @@ wolos-mirrorlist wolos-mirrorlist   -                                       wolo
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
 wopkg          wopkg                -                                       wopkg/
 libwol         libwol               -                                       libwol/
+libwolkit      libwolkit            -                                       libwolkit/
+wolkit         wolkit               libwolkit,libwol                        wolkit/
 wolos-hue      wolos-hue            -                                       wolos-hue/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/

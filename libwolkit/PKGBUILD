@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # libwolkit: the WolOS UI engine behind a stable C ABI (ADR 0039), libwolkit.so.1 and wolkit.h, built
-# from crates/wolkit of github.com/wonderlandos/wolos. The Cryswol-side wolkit shard (Crystal, ADR 0036)
-# binds it; any language can link it. The exports and symbol versions come only from
-# crates/wolkit/abi/wolkit.map (link.sh), the soname is the ABI major.
+# from crates/wolkit of github.com/wonderlandos/wolos, and wolkit-stylec, the style compiler app
+# builds run. The Cryswol-side wolkit shard (Crystal, ADR 0036) binds it; any language can link it.
+# The exports and symbol versions come only from crates/wolkit/abi/wolkit.map (link.sh), the soname
+# is the ABI major.
 pkgname=libwolkit
 pkgver=1.0.0  # WOLKIT_VERSION_MAJOR.MINOR.PATCH of crates/wolkit/include/wolkit.h at _wolos_commit
 pkgrel=1
@@ -12,8 +13,10 @@ url='https://github.com/wonderlandos/wolos'
 # libwolkit is BSD-2-Clause (crates/wolkit, shared, core); the statically linked Rust crates it
 # carries are BSD-3-Clause, MIT, Apache-2.0 or Unicode-3.0.
 license=(BSD-2-Clause BSD-3-Clause MIT Apache-2.0 Unicode-3.0)
-# The native backend (WK-W4) adds libxkbcommon here when it links it; the GPU backend (WK-W5) loads Vulkan at run time.
-depends=(gcc-libs glibc)
+# The native backend talks to the compositor through libwayland-client and reads keymaps with
+# libxkbcommon (link.sh links both); the GPU backend loads Vulkan at run time, so a machine without
+# it draws on the CPU.
+depends=(gcc-libs glibc libxkbcommon wayland)
 provides=(libwolkit.so)
 makedepends=(cargo git)
 options=(!debug !lto)
@@ -65,5 +68,7 @@ package() {
   install -Dm755 "$srcdir/lib/libwolkit.so.1" "$pkgdir/usr/lib/libwolkit.so.1"
   ln -s libwolkit.so.1 "$pkgdir/usr/lib/libwolkit.so"
   install -Dm644 "$_repo/crates/wolkit/include/wolkit.h" "$pkgdir/usr/include/wolkit.h"
+  # The style compiler `wol app build` runs (.wolcss -> WSB1 table + typed Crystal class ids).
+  install -Dm755 "$srcdir/target/release/wolkit-stylec" "$pkgdir/usr/bin/wolkit-stylec"
   install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
