@@ -10,13 +10,13 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-dev
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS Developer module: git, GitHub CLI, mise, Code - OSS, lazygit, btop, zellij, podman, Crystal and Cryswol'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(wolos-system git github-cli mise code lazygit btop zellij podman jq
-  ttf-jetbrains-mono-nerd crystal pkgconf libwol cryswol)
+  ttf-jetbrains-mono-nerd 'crystal>=1.22.0' pkgconf libwol cryswol)
 
 package() {
   # Nothing to install: the dependencies are the module.

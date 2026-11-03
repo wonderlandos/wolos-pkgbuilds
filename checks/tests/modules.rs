@@ -54,6 +54,11 @@ fn ids() -> Vec<String> {
 }
 
 /// One bash array or scalar of a PKGBUILD, evaluated as makepkg does.
+/// The package name of a dependency (`crystal>=1.22.0` -> `crystal`).
+fn dep_name(d: &str) -> &str {
+    d.split(['<', '>', '=']).next().unwrap_or(d)
+}
+
 fn pkgvar(dir: &str, var: &str) -> Vec<String> {
     let out = Command::new("bash")
         .current_dir(repo(dir))
@@ -87,7 +92,11 @@ fn every_record_has_its_meta_package_and_the_same_dependencies() {
         assert_eq!(pkgvar(&dir, "arch"), ["any"], "{dir}: a meta package");
         let mut want = vec!["wolos-system".to_string()];
         want.extend(json_list(&rec, "packages"));
-        let mut got = pkgvar(&dir, "depends");
+        // by name: a recipe may add a version floor (`crystal>=1.22.0`) the record leaves out
+        let mut got: Vec<String> = pkgvar(&dir, "depends")
+            .iter()
+            .map(|d| dep_name(d).to_string())
+            .collect();
         assert_eq!(got.len(), {
             let mut u = got.clone();
             u.sort();
@@ -157,15 +166,25 @@ fn dev_module_brings_the_crystal_runtime() {
     let deps = pkgvar("wolos-module-dev", "depends");
     // pkgconf: `crystal build` asks pkg-config for the libraries a shard links.
     for p in ["crystal", "pkgconf", "libwol", "cryswol"] {
-        assert!(deps.iter().any(|d| d == p), "wolos-module-dev lacks {p}");
+        assert!(
+            deps.iter().any(|d| dep_name(d) == p),
+            "wolos-module-dev lacks {p}"
+        );
     }
+    // the compiler at the pinned release or newer (wolos tools/crystal/toolchain.json, RCR-046)
+    assert!(
+        deps.iter().any(|d| d.starts_with("crystal>=")),
+        "wolos-module-dev: crystal without the pinned floor"
+    );
     let ours = wolos_packages();
     for p in ["libwol", "cryswol"] {
         assert!(ours.iter().any(|o| o == p), "{p} is not a [wolos] package");
     }
     // The shard's recipe still pulls the runtime it links.
     let shard = pkgvar("cryswol", "depends");
-    assert!(shard.iter().any(|d| d == "crystal") && shard.iter().any(|d| d == "libwol"));
+    assert!(
+        shard.iter().any(|d| d.starts_with("crystal>=")) && shard.iter().any(|d| d == "libwol")
+    );
     for id in ids() {
         let dir = format!("wolos-module-{id}");
         for d in pkgvar(&dir, "depends") {

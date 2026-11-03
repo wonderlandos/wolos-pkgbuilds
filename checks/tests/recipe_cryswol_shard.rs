@@ -57,9 +57,18 @@ fn the_package_installs_the_shard_with_its_own_make_install() {
         assert!(p.contains(want), "PKGBUILD lacks {want}");
     }
     assert_eq!(scalar(&p, "arch"), "(any)");
-    for d in ["crystal", "libwol"] {
-        assert!(array_has(&p, "depends", d), "cryswol depends lacks {d}");
-    }
+    assert!(
+        p.lines()
+            .find(|l| l.starts_with("depends=("))
+            .is_some_and(|l| l
+                .split(['(', ')', ' '])
+                .any(|w| w.starts_with("'crystal>="))),
+        "cryswol depends lacks crystal at the pinned floor (wolos tools/crystal/toolchain.json)"
+    );
+    assert!(
+        array_has(&p, "depends", "libwol"),
+        "cryswol depends lacks libwol"
+    );
     // The default shard is BSD-2-Clause, the opt-in pkg/realtime parts are GPL-2.0-or-later.
     for l in ["BSD-2-Clause", "GPL-2.0-or-later"] {
         assert!(array_has(&p, "license", l), "cryswol license lacks {l}");

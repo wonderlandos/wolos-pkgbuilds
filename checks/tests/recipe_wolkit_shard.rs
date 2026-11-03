@@ -39,9 +39,14 @@ fn the_package_installs_the_shard_with_its_own_make_install() {
         assert!(p.contains(want), "PKGBUILD lacks {want}");
     }
     let depends = p.lines().find(|l| l.starts_with("depends=(")).unwrap();
-    for d in ["crystal", "cryswol", "libwolkit", "libwol"] {
+    // crystal at the pinned floor (wolos tools/crystal/toolchain.json, RCR-046)
+    for d in ["'crystal>=", "cryswol", "libwolkit", "libwol"] {
         assert!(
-            depends.split(['(', ')', ' ']).any(|w| w == d),
+            depends.split(['(', ')', ' ']).any(|w| if d.ends_with('=') {
+                w.starts_with(d)
+            } else {
+                w == d
+            }),
             "{depends} lacks {d}"
         );
     }
