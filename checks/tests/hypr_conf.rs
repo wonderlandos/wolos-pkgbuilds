@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-//! The desktop hyprland.conf drives hyprbars and window animations; it must agree with the
-//! realtime geometry/curves and the kit (12 px lights, close centre 22.5 px in, 22 px apart).
-//! Live 0.56.2: lights were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
+//! The desktop compositor config drives the title-bar plugin and window animations; it must agree
+//! with the realtime geometry/curves and the kit: 12 px window controls on the right, close
+//! rightmost (centre 22.5 px in from the right edge), then zoom and minimise 22 px apart leftward.
+//! Live 0.56.2: the controls were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
 //! open animation used a 400 ms overshooting spring instead of our ease-out.
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]
