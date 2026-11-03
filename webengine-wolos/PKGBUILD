@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# webengine-wolos: the Rust browser engine of the WolOS web-app runtime (ADR 0042), built once per pin
+# into libwolwebengine.so.1 (C ABI 1, wolwebengine.h); crates/webengine of wolos loads it and every
+# web app of the runtime uses this one copy. The shim (crates/webengine/engine + src/engine of
+# github.com/wonderlandos/wolos) is built as a member of the engine's own workspace at the pinned
+# commit, so the engine's Cargo.lock decides every version; prepare() checks that adding the shim
+# changed nothing else in it. Exports and symbol versions come only from wolwebengine.map (link.sh).
+pkgname=webengine-wolos
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS web-app runtime engine: libwolwebengine.so.1 and wolwebengine.h (the Rust browser engine at a pinned commit)'
+arch=(x86_64)
+url='https://github.com/wonderlandos/wolos'
+# The engine and its crates are MPL-2.0 (with MIT, Apache-2.0, BSD and Unicode-3.0 dependencies);
+# the shim is BSD-2-Clause.
+license=(MPL-2.0 BSD-2-Clause MIT Apache-2.0 BSD-3-Clause Unicode-3.0)
+# fontconfig, zlib and the C++ runtime are linked (link.sh); EGL (libglvnd), the Mesa drivers (the
+# headless target renders with llvmpipe) and libwayland-egl are loaded at run time by the engine.
+depends=(gcc-libs glibc fontconfig zlib libglvnd mesa wayland)
+provides=(libwolwebengine.so)
+makedepends=(cargo clang llvm python git curl)
+# The goldens' font, and the shell's manifest for cargo (crates/shell is a workspace member).
+checkdepends=(ttf-dejavu libxkbcommon)
+options=(!debug !lto)
+# The engine at one commit (tag v0.7.0, MPL-2.0 at the pin, docs/THIRD-PARTY.md of wolos), as a
+# tarball: cargo cannot list a package's files from the engine's git index ("failed to open git
+# index"), so the build never runs inside a git checkout of it.
+# A `_rev`, not a `_commit`: bump-wolos.sh rewrites the wolos pins only (RP-041); this one moves by
+# hand with the engine (docs/modules/webengine.md of wolos, "Bumping the pin").
+_engine_rev=aac43a3f31a259f04a574f5ec4e959c943ad7cc7
+# The engine's JavaScript engine, prebuilt by its project for this crate version (mozjs_sys
+# 153.3.0-1); fetched here with its checksum instead of by the crate's build script.
+_mozjs=153.3.0-1
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules (cargo
+# reads every workspace member for check()).
+_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+_brand_commit=6c6d2c0511b8d1427d81929d537113e71e7be737
+_shell_commit=b72d6806e8939ceb218ec0190707a381515a22a4
+source=("servo-$_engine_rev.tar.gz::https://github.com/servo/servo/archive/$_engine_rev.tar.gz"
+  "libmozjs-$_mozjs-x86_64-unknown-linux-gnu.tar.gz::https://github.com/servo/mozjs/releases/download/mozjs-sys-v$_mozjs/libmozjs-x86_64-unknown-linux-gnu.tar.gz"
+  "wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
+sha256sums=('90b8d3f13cd23089cbcb465f671d1c53069a92a7608c8abad0245c029d0155cf'
+  'e0e2537112bcbd803d91ccc6b18a88e2c9fd0f2cbd1bd760275a5d5d896fa68b'
+  SKIP SKIP SKIP)
+noextract=("libmozjs-$_mozjs-x86_64-unknown-linux-gnu.tar.gz")
+
+# The shim's lock entry is the only change adding it may make to the engine's Cargo.lock.
+_lock_without_shim() {
+  awk 'BEGIN { RS = ""; ORS = "\n\n" } !/\nname = "wolwebengine"\n/' "$1"
+}
+
+prepare() {
+  local _engine=$srcdir/servo-$_engine_rev
+  cd "$srcdir/wolos"
+  git submodule init
+  git config submodule.design.url "$srcdir/wolos-brand"
+  git config submodule.crates/shell.url "$srcdir/wolos-shell"
+  git -c protocol.file.allow=always submodule update
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+
+  cd "$_engine"
+  rm -rf ports/wolwebengine
+  mkdir -p ports/wolwebengine
+  cp -r "$srcdir/wolos/crates/webengine/." ports/wolwebengine/
+  sed -i 's#^    "ports/servoshell",$#&\n    "ports/wolwebengine/engine",#' Cargo.toml
+  grep -q '"ports/wolwebengine/engine"' Cargo.toml
+  cp Cargo.lock "$srcdir/Cargo.lock.pin"
+  cargo fetch --target "$(rustc -vV | sed -n 's/^host: //p')"
+  if ! cmp -s <(_lock_without_shim "$srcdir/Cargo.lock.pin") <(_lock_without_shim Cargo.lock); then
+    diff <(_lock_without_shim "$srcdir/Cargo.lock.pin") <(_lock_without_shim Cargo.lock) | head -40
+    echo "the shim changed the engine's Cargo.lock beyond its own entry" >&2
+    return 1
+  fi
+}
+
+build() {
+  local _engine=$srcdir/servo-$_engine_rev _j
+  cd "$_engine"
+  case " ${MAKEFLAGS:-} " in *' -j'[0-9]*) _j=${MAKEFLAGS##*-j}; _j=${_j%% *} ;; *) _j=$(nproc) ;; esac
+  if command -v sccache >/dev/null && [ -z "${RUSTC_WRAPPER:-}" ]; then export RUSTC_WRAPPER=sccache; fi
+  # The engine builds with clang (its C++ and bindgen); the pinned prebuilt JavaScript engine.
+  export CC=clang CXX=clang++
+  export MOZJS_ARCHIVE=$srcdir/libmozjs-$_mozjs-x86_64-unknown-linux-gnu.tar.gz
+  CARGO_TARGET_DIR=$srcdir/target cargo build -p wolwebengine --release --frozen \
+    -j"${CARGO_BUILD_JOBS:-$_j}"
+  ports/wolwebengine/engine/link.sh "$srcdir/target/release/libwolwebengine.a" "$srcdir/lib"
+  if [ "${RUSTC_WRAPPER:-}" = sccache ]; then sccache --show-stats || true; fi
+}
+
+check() {
+  local _lib=$srcdir/lib/libwolwebengine.so.1
+  # Exactly the ABI's exports, each at its version.
+  local _want _have
+  _want=$(sed -n 's/^ *\(wwe_[a-z_]*\);$/\1/p' "$srcdir/wolos/crates/webengine/engine/wolwebengine.map" | sort)
+  _have=$(nm -D --defined-only "$_lib" | awk '$2 == "T" { sub(/@.*/, "", $3); print $3 }' | sort)
+  [ "$_want" = "$_have" ] || { echo "exports differ from wolwebengine.map" >&2; return 1; }
+  readelf -d "$_lib" | grep -q 'SONAME.*\[libwolwebengine.so.1\]'
+  # The adaptor's tests against this library: the headless golden (a local page to PNG, the
+  # origin gate) and the content process.
+  cd "$srcdir/wolos"
+  WOL_WEBENGINE_LIB=$_lib WOL_WEBENGINE_REQUIRED=1 HOME=$srcdir XDG_RUNTIME_DIR=$srcdir \
+    CARGO_TARGET_DIR=$srcdir/target-wolos cargo test -p webengine --release --locked
+}
+
+package() {
+  local _engine=$srcdir/servo-$_engine_rev _repo=$srcdir/wolos
+  install -Dm755 "$srcdir/lib/libwolwebengine.so.1" "$pkgdir/usr/lib/libwolwebengine.so.1"
+  ln -s libwolwebengine.so.1 "$pkgdir/usr/lib/libwolwebengine.so"
+  install -Dm644 "$_repo/crates/webengine/engine/include/wolwebengine.h" \
+    "$pkgdir/usr/include/wolwebengine.h"
+  install -Dm644 "$_engine/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-engine"
+  install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
