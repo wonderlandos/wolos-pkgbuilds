@@ -1,19 +1,24 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Mon, 26 Oct 2026 02:43:24 -0300
-Subject: [PATCH 1/2] animation: tick once per monitor frame instead of every 1
- ms
+Subject: [PATCH] animation: tick twice per monitor frame instead of every 1 ms
 
+A free-running timer at exactly the refresh rate beats against vblank: some
+frames rendered with no new animation step and some with two (judder on
+window moves, fades and workspace slides). Two ticks per frame of the fastest
+enabled monitor keep the step every frame shows at most half a frame old,
+about 120 wakeups/s at 60 Hz instead of 1000. WolosPerf::animationTickInterval,
+gtest in tests/helpers/WolosPerf.cpp.
 ---
  src/animation/AnimationManager.cpp |  9 ++++++++-
- src/helpers/WolosPerf.hpp          | 27 ++++++++++++++++++++++++++
+ src/helpers/WolosPerf.hpp          | 31 ++++++++++++++++++++++++++++++
  tests/helpers/WolosPerf.cpp        | 31 ++++++++++++++++++++++++++++++
- 3 files changed, 66 insertions(+), 1 deletion(-)
+ 3 files changed, 70 insertions(+), 1 deletion(-)
  create mode 100644 src/helpers/WolosPerf.hpp
  create mode 100644 tests/helpers/WolosPerf.cpp
 
 diff --git a/src/animation/AnimationManager.cpp b/src/animation/AnimationManager.cpp
-index 7742d2f..ddb8684 100644
+index 7742d2f..c2fee5d 100644
 --- a/src/animation/AnimationManager.cpp
 +++ b/src/animation/AnimationManager.cpp
 @@ -1,4 +1,5 @@
@@ -27,7 +32,7 @@ index 7742d2f..ddb8684 100644
      }
  
 -    m_animationTimer->updateTimeout(std::chrono::milliseconds(1));
-+    // WolOS: one tick per frame of the fastest monitor instead of every 1 ms (fewer wakeups while animating).
++    // WolOS: two ticks per frame of the fastest monitor instead of every 1 ms (fewer wakeups while animating).
 +    float fastestHz = 0.F;
 +    for (const auto& mon : State::monitorState()->monitors()) {
 +        if (mon->m_enabled)
@@ -39,10 +44,10 @@ index 7742d2f..ddb8684 100644
  void CHyprAnimationManager::onTicked() {
 diff --git a/src/helpers/WolosPerf.hpp b/src/helpers/WolosPerf.hpp
 new file mode 100644
-index 0000000..8dc3992
+index 0000000..ca33078
 --- /dev/null
 +++ b/src/helpers/WolosPerf.hpp
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,31 @@
 +#pragma once
 +
 +// WolOS idle/CPU policy (ported from IaraOS iara-compositor). Pure functions: tested in tests/helpers/WolosPerf.cpp.
@@ -54,11 +59,15 @@ index 0000000..8dc3992
 +    // Slow safety tick for the cursor-hiding check (was a fixed 2 Hz poll).
 +    inline constexpr int CURSOR_HEARTBEAT_MS = 5000;
 +
-+    // Animations tick once per frame of the fastest enabled monitor (was every 1 ms), never faster than 1 kHz.
++    // Animations tick twice per frame of the fastest enabled monitor (was every 1 ms), never faster than 1 kHz.
++    // Not once per frame: a free-running timer at exactly the refresh rate beats against vblank, so some
++    // frames got no animation step and some two (judder). At 2x every frame sees a step at most half a
++    // frame old.
++    inline constexpr int ANIMATION_TICKS_PER_FRAME = 2;
 +    inline std::chrono::microseconds animationTickInterval(float fastestHz) {
 +        if (fastestHz <= 0.F)
 +            fastestHz = 60.F;
-+        return std::chrono::microseconds(std::max(1000, static_cast<int>(1000000.0 / fastestHz)));
++        return std::chrono::microseconds(std::max(1000, static_cast<int>(1000000.0 / (fastestHz * ANIMATION_TICKS_PER_FRAME))));
 +    }
 +
 +    // Sleep until the cursor inactivity timeout can fire, or the heartbeat, whichever is sooner.
@@ -72,7 +81,7 @@ index 0000000..8dc3992
 +}
 diff --git a/tests/helpers/WolosPerf.cpp b/tests/helpers/WolosPerf.cpp
 new file mode 100644
-index 0000000..bc91519
+index 0000000..a316596
 --- /dev/null
 +++ b/tests/helpers/WolosPerf.cpp
 @@ -0,0 +1,31 @@
@@ -82,11 +91,11 @@ index 0000000..bc91519
 +
 +using namespace WolosPerf;
 +
-+TEST(WolosPerf, animationTickFollowsFastestMonitor) {
++TEST(WolosPerf, animationTickIsTwicePerFrameOfFastestMonitor) {
 +    struct {
 +        float hz;
 +        int   us;
-+    } cases[] = {{60.F, 16666}, {144.F, 6944}, {0.F, 16666}, {-1.F, 16666}, {2000.F, 1000}};
++    } cases[] = {{60.F, 8333}, {144.F, 3472}, {0.F, 8333}, {-1.F, 8333}, {500.F, 1000}, {2000.F, 1000}};
 +    for (auto c : cases)
 +        EXPECT_EQ(animationTickInterval(c.hz).count(), c.us) << c.hz;
 +}
@@ -107,6 +116,3 @@ index 0000000..bc91519
 +    for (auto c : cases)
 +        EXPECT_EQ(cursorTickerDelayMs(c.timeoutS, c.hidden, c.sinceMoveS), c.ms) << c.timeoutS << " " << c.sinceMoveS;
 +}
--- 
-2.54.0
-

@@ -1,5 +1,5 @@
 # CachyOS x86-64-v3 repos for [cachyos-v3], [cachyos-core-v3], [cachyos-extra-v3] (ADR 0030).
 # One server: the WolOS CDN answers /cachy/<repo>/<file> with a 302 to a ranked CachyOS mirror
 # (wolos-build/cdn; nothing is cached). No date: these repos roll. `wol mirror rank` and
-# `wol update` leave this file alone. Same REPO_DOMAIN as wolos-mirrorlist.
-Server = https://REPO_DOMAIN/cachy/$repo
+# `wol update` leave this file alone. Same domain as wolos-mirrorlist: off until it exists.
+#Server = https://REPO_DOMAIN/cachy/$repo

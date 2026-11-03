@@ -10,8 +10,7 @@ mod siblings;
 
 use std::{fs, path::PathBuf, process::Command};
 fn repo(p: &str) -> PathBuf {
-    siblings::root()
-        .join(p)
+    siblings::root().join(p)
 }
 
 fn read(p: &str) -> String {
@@ -20,11 +19,16 @@ fn read(p: &str) -> String {
 
 /// The fork's kernel/configs/wolos.config at the tag the recipe pins.
 fn fragment() -> String {
-    let src = std::env::var_os("WOLOS_LINUX")
-        .map_or_else(|| PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../linux")), PathBuf::from);
+    let src = std::env::var_os("WOLOS_LINUX").map_or_else(
+        || PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../linux")),
+        PathBuf::from,
+    );
     let p = src.join("kernel/configs/wolos.config");
     fs::read_to_string(&p).unwrap_or_else(|e| {
-        panic!("{}: {e} (set WOLOS_LINUX to the fork at the linux-wolos tag)", p.display())
+        panic!(
+            "{}: {e} (set WOLOS_LINUX to the fork at the linux-wolos tag)",
+            p.display()
+        )
     })
 }
 
@@ -109,12 +113,12 @@ fn version_has_one_source_and_shows_the_linux_base_in_parentheses() {
         read("linux-wolos/README.md").contains(&shown),
         "README lacks {shown}"
     );
-    for pkg in [
-        "linux-wolos/PKGBUILD",
-        "linux-wolos-api-headers/PKGBUILD",
-    ] {
+    for pkg in ["linux-wolos/PKGBUILD", "linux-wolos-api-headers/PKGBUILD"] {
         let p = read(pkg);
-        assert!(p.contains("VERSION"), "{pkg} does not read linux-wolos/VERSION");
+        assert!(
+            p.contains("VERSION"),
+            "{pkg} does not read linux-wolos/VERSION"
+        );
         assert!(!p.contains("pkgver=7."), "{pkg} hard-codes the version");
         let dir = repo(pkg).parent().unwrap().to_path_buf();
         let out = Command::new("bash")

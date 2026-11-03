@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-//! The desktop hyprland.conf drives hyprbars and window animations; it must agree with the
-//! realtime geometry/curves and the kit (12 px lights, close centre 22.5 px in, 22 px apart).
-//! Live 0.56.2: lights were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
+//! The desktop compositor config drives the title-bar plugin and window animations; it must agree
+//! with the realtime geometry/curves and the kit: 12 px window controls on the right, close
+//! rightmost (centre 22.5 px in from the right edge), then zoom and minimise 22 px apart leftward.
+//! Live 0.56.2: the controls were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
 //! open animation used a 400 ms overshooting spring instead of our ease-out.
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]
@@ -9,12 +10,16 @@ mod siblings;
 
 /// wolos desktop/overlay/usr/share/wolos/hypr/hyprland.conf (a sibling repo: read at run time).
 fn conf() -> String {
-    let p = format!("{}/desktop/overlay/usr/share/wolos/hypr/hyprland.conf", siblings::root_str());
+    let p = format!(
+        "{}/desktop/overlay/usr/share/wolos/hypr/hyprland.conf",
+        siblings::root_str()
+    );
     std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{p}: {e}"))
 }
 
 fn value(key: &str) -> String {
-    conf().lines()
+    conf()
+        .lines()
         .map(str::trim)
         .find_map(|l| {
             l.strip_prefix(key)?
@@ -29,8 +34,11 @@ fn value(key: &str) -> String {
 /// ".conf ... removed in 0.57"). Customers must never see compositor nags.
 #[test]
 fn session_starts_hyprland_without_nag_banners() {
-    let session = std::fs::read_to_string(format!("{}/desktop/overlay/usr/bin/wol-session", siblings::root_str()))
-        .expect("wolos desktop/overlay/usr/bin/wol-session");
+    let session = std::fs::read_to_string(format!(
+        "{}/desktop/overlay/usr/bin/wol-session",
+        siblings::root_str()
+    ))
+    .expect("wolos desktop/overlay/usr/bin/wol-session");
     let launch = session
         .lines()
         .rev()

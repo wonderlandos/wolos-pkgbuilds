@@ -14,10 +14,7 @@ use std::{
 #[test]
 fn the_sealed_system_can_not_enable_units_at_first_start() {
     let root = siblings::root_str();
-    let i = std::fs::read_to_string(format!(
-        "{root}/wolos-system/wolos-system.install"
-    ))
-    .unwrap();
+    let i = std::fs::read_to_string(format!("{root}/wolos-system/wolos-system.install")).unwrap();
     for u in [
         "wolos-verity-check.service",
         "wolos-tpm-bind.service",

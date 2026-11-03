@@ -9,8 +9,7 @@ mod siblings;
 
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, path::PathBuf, process::Command};
 fn repo(p: &str) -> PathBuf {
-    siblings::root()
-        .join(p)
+    siblings::root().join(p)
 }
 
 fn read(p: &str) -> String {
@@ -28,8 +27,7 @@ fn administrators_can_sudo() {
         .collect();
     assert_eq!(rules, ["%wheel ALL=(ALL:ALL) ALL"]);
     assert!(
-        read("wolos-system/PKGBUILD")
-            .contains(r#"chmod 440 "$pkgdir/etc/sudoers.d/wolos""#),
+        read("wolos-system/PKGBUILD").contains(r#"chmod 440 "$pkgdir/etc/sudoers.d/wolos""#),
         "sudoers drop-in must be 0440"
     );
     // sudo-rs reads /etc/sudoers, ours (sudo_works_on_every_system).
@@ -65,11 +63,16 @@ fn sudo_works_on_every_system() {
 }
 
 #[test]
-fn files_offers_clamav_and_the_action_can_only_start_wol_analyze() {
+fn files_offers_the_full_check_and_the_action_can_only_start_wol_analyze() {
     let root = siblings::root();
     let read = |p: &str| std::fs::read_to_string(root.join(p)).unwrap();
     let c = read("desktop/nautilus/wolos-analyze.c");
-    assert!(c.contains("\"Analyze with ClamAV\""));
+    // The label names what it does, not whose engine (Wonderland Doctrine).
+    assert!(c.contains("#define MENU_LABEL \"Check for Malware\""));
+    assert!(
+        !c.to_lowercase().contains("clamav"),
+        "no engine name in the action"
+    );
     assert!(c.contains("\"wol-analyze\""));
     let rust = read("tools/build-rust.sh");
     assert!(rust.contains(" wol-analyze"));

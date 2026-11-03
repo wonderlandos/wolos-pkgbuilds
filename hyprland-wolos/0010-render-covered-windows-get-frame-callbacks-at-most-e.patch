@@ -1,20 +1,28 @@
-From 3e3686b45e138c63030517f314964b2c41a6ac70 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Fri, 30 Oct 2026 11:50:47 -0300
-Subject: [PATCH 10/12] render: covered windows get frame callbacks at most
- every 33 ms or 2 updates when more than 10 windows are open
+Subject: [PATCH] render: covered windows get frame callbacks at most every 33
+ ms or 2 updates when more than 10 windows are open
 
 New misc keys: throttle_occluded, throttle_window_count, throttle_occlusion_cutoff, throttle_freeze_ms,
 throttle_freeze_updates, reconfigure_ack_timeout_ms, frame_deadline.
 
+A window above counts as an occluder with its whole box when its surface is
+opaque, else with the extents of its opaque region (rounded corners and CSD
+shadows make the surface non-opaque but leave the region over the content);
+faded or translucent windows cover nothing. Under a fullscreen window only the
+windows Hyprland hides there are covered: dialogs, popups and pinned windows
+allowed over it keep their frames. WolosPerf::occluderRect and
+coveredByFullscreen, gtest in tests/helpers/WolosPerf.cpp.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/config/values/ConfigValues.cpp |  8 ++++
- src/helpers/WolosPerf.hpp          | 65 ++++++++++++++++++++++++++++++
- src/render/Renderer.cpp            | 61 ++++++++++++++++++++++++++++
- src/render/Renderer.hpp            |  5 +++
- tests/helpers/WolosPerf.cpp        | 35 ++++++++++++++++
- 5 files changed, 174 insertions(+)
+ src/config/values/ConfigValues.cpp |  8 +++
+ src/helpers/WolosPerf.hpp          | 85 ++++++++++++++++++++++++++++++
+ src/render/Renderer.cpp            | 68 ++++++++++++++++++++++++
+ src/render/Renderer.hpp            |  5 ++
+ tests/helpers/WolosPerf.cpp        | 59 +++++++++++++++++++++
+ 5 files changed, 225 insertions(+)
 
 diff --git a/src/config/values/ConfigValues.cpp b/src/config/values/ConfigValues.cpp
 index 4954aeb..1679991 100644
@@ -36,7 +44,7 @@ index 4954aeb..1679991 100644
          MS<Bool>("misc:disable_hyprland_guiutils_check", "disable the warning if hyprland-guiutils is missing", false),
          MS<Bool>("misc:disable_watchdog_warning", "whether to disable the warning about not using start-hyprland.", false),
 diff --git a/src/helpers/WolosPerf.hpp b/src/helpers/WolosPerf.hpp
-index ed0dc9a..0fe433b 100644
+index 520d6a9..32b89b2 100644
 --- a/src/helpers/WolosPerf.hpp
 +++ b/src/helpers/WolosPerf.hpp
 @@ -4,6 +4,7 @@
@@ -47,7 +55,7 @@ index ed0dc9a..0fe433b 100644
  
  namespace WolosPerf {
      // Slow safety tick for the cursor-hiding check (was a fixed 2 Hz poll).
-@@ -39,4 +40,68 @@ namespace WolosPerf {
+@@ -43,4 +44,88 @@ namespace WolosPerf {
      inline bool autoScanoutAllows(bool contentGame, bool contentVideo, bool tearingHint) {
          return contentGame || contentVideo || tearingHint;
      }
@@ -103,6 +111,26 @@ index ed0dc9a..0fe433b 100644
 +        return visible / (self.w * self.h);
 +    }
 +
++    // Under a fullscreen window only the windows Hyprland hides there count as covered: the fullscreen
++    // window itself, and whatever is allowed over it (dialogs, popups, pinned windows) keep their frames.
++    inline bool coveredByFullscreen(bool fullscreenOnWorkspace, bool isTheFullscreenWindow, bool allowedOverFullscreen) {
++        return fullscreenOnWorkspace && !isTheFullscreenWindow && !allowedOverFullscreen;
++    }
++
++    // What of a window covers the windows below it: its whole box when the client says the surface is opaque,
++    // else the extents of the opaque region it set (surface-local, logical), cut to the box. Rounded corners and
++    // CSD shadows make a surface non-opaque but leave the region over the content. Empty: covers nothing.
++    inline SRect occluderRect(const SRect& box, bool opaque, const SRect& opaqueExtents) {
++        if (opaque)
++            return box;
++        const double x0 = std::max(box.x, box.x + opaqueExtents.x), y0 = std::max(box.y, box.y + opaqueExtents.y);
++        const double x1 = std::min(box.x + box.w, box.x + opaqueExtents.x + opaqueExtents.w);
++        const double y1 = std::min(box.y + box.h, box.y + opaqueExtents.y + opaqueExtents.h);
++        if (opaqueExtents.w <= 0 || opaqueExtents.h <= 0 || x1 <= x0 || y1 <= y0)
++            return SRect{};
++        return SRect{x0, y0, x1 - x0, y1 - y0};
++    }
++
 +    // True when the surface gets its frame callback now. `elapsedMs` is the time since the previous opportunity.
 +    inline bool allowFrameCallback(SThrottleState& st, double visible, int mappedWindows, double elapsedMs, const SThrottleConfig& c) {
 +        st.sinceSentMs += elapsedMs;
@@ -117,10 +145,10 @@ index ed0dc9a..0fe433b 100644
 +    }
  }
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 06a1b6f..375e820 100644
+index 33a4992..3e2b08d 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
-@@ -2511,12 +2511,73 @@ void IHyprRenderer::renderWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace
+@@ -2514,12 +2514,80 @@ void IHyprRenderer::renderWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace
  }
  
  void IHyprRenderer::sendFrameEventsToWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& now) {
@@ -157,8 +185,8 @@ index 06a1b6f..375e820 100644
 +                const auto WPTR = Hyprutils::Memory::dynamicPointerCast<Desktop::View::CWindow>(view);
 +                const auto W    = WPTR.get();
 +                double     visible = 1.0;
-+                if (FS && FS.get() != W)
-+                    visible = 0.0; // something fullscreen covers the whole workspace
++                if (WolosPerf::coveredByFullscreen(FS != nullptr, FS.get() == W, W->isAllowedOverFullscreen()))
++                    visible = 0.0; // hidden under the fullscreen window
 +                else {
 +                    const auto               BOX = W->getWindowMainSurfaceBox();
 +                    std::vector<WolosPerf::SRect> above;
@@ -168,10 +196,17 @@ index 06a1b6f..375e820 100644
 +                            after = true;
 +                            continue;
 +                        }
-+                        if (after && o->m_workspace == pWorkspace && o->opaque()) {
-+                            const auto OB = o->getWindowMainSurfaceBox();
-+                            above.push_back(WolosPerf::SRect{OB.x, OB.y, OB.w, OB.h});
-+                        }
++                        if (!after || o->m_workspace != pWorkspace)
++                            continue;
++                        // Faded or translucent windows show what is below them.
++                        if (o->alphaValue(Desktop::View::WINDOW_ALPHA_FADE) != 1.F || o->alphaValue(Desktop::View::WINDOW_ALPHA_ACTIVE) != 1.F)
++                            continue;
++                        const auto OS = o->wlSurface() ? o->wlSurface()->resource() : nullptr;
++                        const auto OE = OS ? OS->m_current.opaque.getExtents() : CBox{};
++                        const auto OB = o->getWindowMainSurfaceBox();
++                        const auto R  = WolosPerf::occluderRect(WolosPerf::SRect{OB.x, OB.y, OB.w, OB.h}, o->opaque(), WolosPerf::SRect{OE.x, OE.y, OE.w, OE.h});
++                        if (R.w > 0 && R.h > 0)
++                            above.push_back(R);
 +                    }
 +                    visible = WolosPerf::visibleFraction(WolosPerf::SRect{BOX.x, BOX.y, BOX.w, BOX.h}, above);
 +                }
@@ -218,10 +253,10 @@ index fcb1ff1..de1a9d0 100644
          friend class CRenderPass;
          friend class Render::GL::CHyprOpenGLImpl;
 diff --git a/tests/helpers/WolosPerf.cpp b/tests/helpers/WolosPerf.cpp
-index 677b169..2d9b030 100644
+index cf35417..1e747d9 100644
 --- a/tests/helpers/WolosPerf.cpp
 +++ b/tests/helpers/WolosPerf.cpp
-@@ -49,3 +49,38 @@ TEST(WolosPerf, autoScanoutCoversGamesAndVideo) {
+@@ -50,3 +50,62 @@ TEST(WolosPerf, autoScanoutCoversGamesAndVideo) {
      EXPECT_TRUE(autoScanoutAllows(false, false, true));   // Proton game: tearing hint, no content type
      EXPECT_FALSE(autoScanoutAllows(false, false, false)); // a fullscreen editor keeps composition
  }
@@ -249,6 +284,30 @@ index 677b169..2d9b030 100644
 +    EXPECT_TRUE(allowFrameCallback(st2, 0.0, 11, 23.4, c)); // 33.4 ms >= 33.3
 +}
 +
++TEST(WolosPerf, fullscreenCoversOnlyWhatHyprlandHidesUnderIt) {
++    EXPECT_TRUE(coveredByFullscreen(true, false, false));   // a window under the game
++    EXPECT_FALSE(coveredByFullscreen(true, true, false));   // the game itself
++    EXPECT_FALSE(coveredByFullscreen(true, false, true));   // a dialog or popup allowed over it keeps 60 fps
++    EXPECT_FALSE(coveredByFullscreen(false, false, false)); // no fullscreen window: occlusion decides
++}
++
++TEST(WolosPerf, roundedAndShadowedWindowsStillOcclude) {
++    const SRect box{100, 100, 400, 300};
++    const SRect r = occluderRect(box, true, {});
++    EXPECT_DOUBLE_EQ(r.w * r.h, 400.0 * 300.0); // opaque surface: the whole box
++    // GTK with rounded corners: opaque region over the content, a few px in from the edges
++    const SRect g = occluderRect(box, false, {0, 12, 400, 276});
++    EXPECT_DOUBLE_EQ(g.x, 100);
++    EXPECT_DOUBLE_EQ(g.y, 112);
++    EXPECT_DOUBLE_EQ(g.h, 276);
++    EXPECT_NEAR(visibleFraction(SRect{150, 150, 100, 100}, {g}), 0.0, 1e-9); // a window under it counts as covered
++    // a region past the box is cut to it; no region covers nothing
++    const SRect c = occluderRect(box, false, {-50, -50, 1000, 1000});
++    EXPECT_DOUBLE_EQ(c.w * c.h, 400.0 * 300.0);
++    EXPECT_DOUBLE_EQ(occluderRect(box, false, {}).w, 0);
++    EXPECT_DOUBLE_EQ(occluderRect(box, false, {500, 0, 10, 10}).w, 0);
++}
++
 +TEST(WolosPerf, throttleNeedsManyWindowsAndLowVisibility) {
 +    SThrottleConfig c;
 +    SThrottleState  st;
@@ -260,6 +319,3 @@ index 677b169..2d9b030 100644
 +    c.enabled = false;
 +    EXPECT_TRUE(allowFrameCallback(st, 0.0, 20, 1.0, c));
 +}
--- 
-2.54.0
-

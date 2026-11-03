@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-dev (ADR 0032, wolos docs/modules/modules.md): the "Developer" optional module.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/dev.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package except the WolOS userland language runtime: crystal and pkgconf (Arch) plus libwol and
+# the cryswol shard (this repo's [wolos] packages), so `require "cryswol"` builds and runs on an
+# installed system; nothing outside Arch or [wolos] is a dependency. User side (`wol modules enable dev`):
+# ~/Work and the rootless podman socket (/usr/lib/wolos/modules-enable-dev).
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-dev
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Developer module: git, GitHub CLI, mise, Code - OSS, lazygit, btop, zellij, podman, Crystal and Cryswol'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system git github-cli mise code lazygit btop zellij podman jq
+  ttf-jetbrains-mono-nerd crystal pkgconf libwol cryswol)
+
+package() {
+  # Nothing to install: the dependencies are the module.
+  :
+}

@@ -4,7 +4,7 @@
 # keep them), and the consent hook that Settings > Privacy reads. Packaging follows Arch's flatpak.
 pkgname=flatpak-wolos
 pkgver=1.16.6.wolos1
-pkgrel=1
+pkgrel=2
 epoch=1
 pkgdesc='Linux application sandboxing and distribution framework, WolOS build'
 arch=(x86_64)

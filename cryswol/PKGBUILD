@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# cryswol: the WolOS app framework for Crystal (ADR 0036), the shard over libwol from
+# wolos-crystal/shards/cryswol of github.com/wonderlandos/wolos: windows, notifications, menus,
+# answers and services as Crystal objects, under /usr/lib/wolos/crystal/cryswol (so
+# `require "cryswol"` works on that CRYSTAL_PATH entry). The wolkit shard is built on it. The
+# shard's own `make install` decides the layout.
+pkgname=cryswol
+pkgver=0.1.0  # version: of wolos-crystal/shards/cryswol/shard.yml at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS app framework for Crystal: the cryswol shard over libwol'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+# The default shard is BSD-2-Clause; the opt-in parts (require "cryswol/pkg" and
+# "cryswol/realtime") are GPL-2.0-or-later.
+license=(BSD-2-Clause GPL-2.0-or-later)
+# Apps built with the shard link libwol.
+depends=(crystal libwol)
+optdepends=('wopkg: libwopkg.so.1 for require "cryswol/pkg"')
+makedepends=(git)
+options=(!debug)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). The shard is plain Crystal
+# source: no submodule is needed to install or check it.
+_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+check() {
+  cd "$srcdir/wolos/wolos-crystal/shards/cryswol"
+  # The source is formatted (crystal only). The specs need libwol and the fake host built with
+  # cargo (make spec): they run in the wolos CI.
+  make fmt-check
+}
+
+package() {
+  cd "$srcdir/wolos/wolos-crystal/shards/cryswol"
+  make install DESTDIR="$pkgdir" PREFIX=/usr
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

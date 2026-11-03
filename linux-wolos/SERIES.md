@@ -1,16 +1,18 @@
 # WolKernel series (linux-wolos)
 
-Shape (like Android's common kernel): stable core + small WolOS series + fixed userspace interface + KMI.
+Shape: stable core + small WolOS series + fixed userspace interface + KMI.
 
 | layer | where |
 |---|---|
-| stable core | github.com/wonderlandos/linux at the ref pinned by `linux-wolos/PKGBUILD` (public) |
+| stable core | github.com/wonderlandos/linux at the tag pinned by `linux-wolos/PKGBUILD` (public) |
 | config | the fork's `kernel/configs/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
-| perf series | `linux/patches/*.patch`, applied in name order by the PKGBUILD |
-| scheduler | `scx_wolos/` (sched_ext BPF + loader + unit); interface: `scx_wolos/INTERFACE.md` |
+| perf series | commits on the fork branch `wolos-7.3`, one per patch; nothing is patched in this repo |
+| scheduler | `kernel/scx_wolos/` in the wolos repo (sched_ext BPF + loader + unit; interface: `INTERFACE.md` there); built and tested in-tree, not shipped in v0.12 |
 | KMI | `kmi/` symbol freeze per release line |
 
-## Series (base: wonderlandos/linux branch wolos, 3f88c73)
+## Series (fork branch `wolos-7.3`, tag `wolkernel-1.0-7.3`)
+
+The branch `wolos-7.3` of github.com/wonderlandos/linux is the branch `wolos` (f60fabe) plus 21 commits: one commit per patch below (subject = the name in the first column, numbers 0019-0029 are unused) and a last commit that folds the config fragment into `kernel/configs/wolos.config`. The PKGBUILD pins the release tag (`wolkernel-<wolkernel>-<linux>`, currently the head of `wolos-7.3`) by the sha256 of its tarball; `tools/bump-kernel.sh TAG` moves both. Commit messages carry the subject, not the number.
 
 The fork carries the former 0001-0003 (bounded futex spin, `/sys/kernel/wolos` hints, i915 deadline boost) and the public legacy fixes (lazy audit syscall work, int $0x80 from 64-bit, retbleed stuffing, kernel defaults; KUnit `wolos_compat`).
 
@@ -18,10 +20,10 @@ The fork carries the former 0001-0003 (bounded futex spin, `/sys/kernel/wolos` h
 |---|---|---|---|
 | 0004-futex-adaptive-spin | sync | 0001's spin only when the CPU has nothing else runnable, budget scaled by a per-bucket score (wakeup +1, timeout /2); KUnit `wolos_futex_spin` | none upstream |
 | 0005-wolos-policy-kunit | test | `<linux/wolos_policy.h>`: the decisions below as pure functions; KUnit `wolos_policy` (UML) | WolOS-only |
-| 0006-tsc-trust-single-package | time | no clocksource watchdog on one-package bare metal with an invariant TSC, even without TSC_ADJUST (AMD desktops); `tsc=watchdog` restores it | Feng Tang's qualified-platform idea, not merged |
+| 0006-tsc-trust-single-package | time | no clocksource watchdog on one-package bare metal with an invariant TSC, even without TSC_ADJUST (AMD desktops); `tsc=watchdog` restores it | idea discussed upstream, not merged |
 | 0007-vt-kbd-graphics-bypass | input | `kbd_event` returns early in K_OFF + KD_GRAPHICS (compositor session): no keymap, LED tasklet or console work per key; key_down kept | none upstream |
 | 0008-oom-foreground-bias | memory | OOM badness: foreground tgid /4, SCHED_IDLE + RAM/8; oom_score_adj on top | none upstream |
-| 0009-input-boost | input/cpufreq | input handler on key/button devices opens a `wolos_input_boost.ms` (100 ms) window, rate-limited 50 ms; schedutil floors CPUs at `floor_pct` (60%); `wolos_input_boost_chain` for GPU drivers; KUnit `wolos_policy` input_boost | Android cpu-boost idea, none upstream |
+| 0009-input-boost | input/cpufreq | input handler on key/button devices opens a `wolos_input_boost.ms` (100 ms) window, rate-limited 50 ms; schedutil floors CPUs at `floor_pct` (60%); `wolos_input_boost_chain` for GPU drivers; KUnit `wolos_policy` input_boost | none upstream |
 | 0010-pipe-wake-check | ipc | skip the wait-queue lock when nobody sleeps; `pipe.wake_check=0`; single-thread write+read 4% faster; KUnit `wolos_pipe_wake` | none upstream |
 | 0011-sem-one-lock-read | ipc | GETVAL, GETPID, GETNCNT, GETZCNT take one semaphore's lock; `sem.read_one_lock=0`; semops next to a reader 13x; KUnit `wolos_sem_read` | none upstream |
 | 0012-slub-sheaf-scale | memory | sheaf capacity x `slub_sheaf_scale` (1..4, default 2; 1 = stock); hackbench socket +4% vs scale 1 on one binary, not shown against base; KUnit `wolos_slub_sheaf` | none upstream |
@@ -40,16 +42,17 @@ The fork carries the former 0001-0003 (bounded futex spin, `/sys/kernel/wolos` h
 Not ported, Linux already has it: `futex_waitv` (5.16), the sysret fast return (x86 entry always tries SYSRET), ntsync (6.14), memory-pressure freezing (PSI triggers + cgroup v2 `cgroup.freeze`: wold uses these, no patch).
 Not ported, not needed: i915 VBT file fallback (Linux has `i915.vbt_firmware=`; VMs use virtio-gpu).
 Next, in value order: xe deadline/waitboost (needs GuC SLPC min-freq raise, ~60 lines); amdgpu foreground boost (power profile switch).
-Generic fixes that are not product-specific go to the fork as commits on a `wolos` branch, not here. Today: none.
+Generic fixes that are not product-specific go to the fork as commits on the `wolos` branch, not here. Today: none.
 
-Rules: one concern per patch, < 100 lines, each with a header comment and a runtime off switch (module param or sysfs). New userspace-visible names live only in 0002.
+Rules: one concern per patch, < 100 lines, each with a header comment and a runtime off switch (module param or sysfs). New userspace-visible names live only in the hint interface commit (`/sys/kernel/wolos`, `<linux/wolos.h>`).
 
 ## Rebase on a stable bump
 
-1. Bump the ref in the PKGBUILD; `git am linux/patches/*.patch` on the new ref in a scratch clone.
-2. Conflict: fix, `git format-patch` back into `linux/patches/` (same names). A patch upstream now has: delete it, note it above.
-3. `make olddefconfig` with `wolos.config`; diff `scripts/diffconfig` against the last release: every lost line is a decision.
-4. Build, `kmi/kmi.sh check O kmi/wolkernel-<line>.symvers` (same line) or `extract` (new line), build `scx_wolos`, boot test.
+1. In a clone of the fork: create `wolos-<new line>` from the new upstream stable ref and `git cherry-pick` the commits of the previous `wolos-<line>` branch in order (or `git rebase --onto`).
+2. Conflict: fix it in the commit, keeping one commit per patch. A patch upstream now has: drop the commit, note it above.
+3. `make olddefconfig` with `wolos.config`; diff `scripts/diffconfig` against the last release: every lost line is a decision (a requested symbol that is missing from the result was dropped by Kconfig).
+4. Push the branch, tag `wolkernel-<wolkernel>-<linux>`, run `tools/bump-kernel.sh TAG` here (VERSION and the sha256 in both PKGBUILDs).
+5. Build, `kmi/kmi.sh check O kmi/wolkernel-<line>.symvers` (same line) or `extract` (new line), boot test.
 
 ## WolKernel userspace ABI rules
 
@@ -59,7 +62,7 @@ Rules: one concern per patch, < 100 lines, each with a header comment and a runt
   - Everything else Arch already disables (uselib, sysfs(2), legacy PTYs, TIOCSTI, uevent helper, COMPAT_BRK). vsyscall emulation and ioperm stay: old static binaries and Wine/DOS tools still use them.
 - Added: only `<linux/wolos.h>` + `/sys/kernel/wolos`. `abi_version` increments on any change; fields are never repurposed.
 - Mitigations: Arch defaults (auto per CPU). No remote/browser-facing mitigation is disabled; tuning happens per CPU generation via the default `auto` selection only.
-- The UAPI headers package (`linux-wolos-api-headers`) is built from the same tree with these patches, so userspace sees exactly this ABI.
+- The UAPI headers package (`linux-wolos-api-headers`) is built from the same tag, so it carries these patches, so userspace sees exactly this ABI.
 
 ## KMI policy
 
@@ -70,5 +73,3 @@ Rules: one concern per patch, < 100 lines, each with a header comment and a runt
 ## Licensing note
 
 Kernel patches and `scx_wolos.bpf.c` are GPL-2.0 (Linux and the sched_ext kfuncs require it). Shipping binaries built from them obliges offering their source to recipients.
-
-FreeBSD-era patches and checks are kept for reference in `freebsd/`; nothing builds them.

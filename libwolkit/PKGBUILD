@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# libwolkit: the WolOS UI engine behind a stable C ABI (ADR 0039), libwolkit.so.1 and wolkit.h, built
+# from crates/wolkit of github.com/wonderlandos/wolos, and wolkit-stylec, the style compiler app
+# builds run. The Cryswol-side wolkit shard (Crystal, ADR 0036) binds it; any language can link it.
+# The exports and symbol versions come only from crates/wolkit/abi/wolkit.map (link.sh), the soname
+# is the ABI major.
+pkgname=libwolkit
+pkgver=1.0.0  # WOLKIT_VERSION_MAJOR.MINOR.PATCH of crates/wolkit/include/wolkit.h at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS UI engine: libwolkit.so.1 and wolkit.h, the stable C ABI the wolkit shard binds'
+arch=(x86_64)
+url='https://github.com/wonderlandos/wolos'
+# libwolkit is BSD-2-Clause (crates/wolkit, shared, core); the statically linked Rust crates it
+# carries are BSD-3-Clause, MIT, Apache-2.0 or Unicode-3.0.
+license=(BSD-2-Clause BSD-3-Clause MIT Apache-2.0 Unicode-3.0)
+# The native backend talks to the compositor through libwayland-client and reads keymaps with
+# libxkbcommon (link.sh links both); the GPU backend loads Vulkan at run time, so a machine without
+# it draws on the CPU.
+depends=(gcc-libs glibc libxkbcommon wayland)
+provides=(libwolkit.so)
+makedepends=(cargo git)
+options=(!debug !lto)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules
+# (cargo reads every workspace member, crates/shell included).
+_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
+# The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
+_brand_commit=743d616a733b8e91b86a10e735e41f180352dfb3
+_shell_commit=1d1e966c8da4e16490a7aaeec5d2974f891a8174
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+  "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
+sha256sums=(SKIP SKIP SKIP)
+
+prepare() {
+  cd "$srcdir/wolos"
+  git submodule init
+  git config submodule.design.url "$srcdir/wolos-brand"
+  git config submodule.crates/shell.url "$srcdir/wolos-shell"
+  git -c protocol.file.allow=always submodule update
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
+
+build() {
+  local _repo=$srcdir/wolos _j
+  cd "$_repo"
+  # The jobs makepkg was given (MAKEFLAGS -jN, or wolos-build's CARGO_BUILD_JOBS), else every core.
+  case " ${MAKEFLAGS:-} " in *' -j'[0-9]*) _j=${MAKEFLAGS##*-j}; _j=${_j%% *} ;; *) _j=$(nproc) ;; esac
+  # sccache when the build has it (wolos-build binds SCCACHE_DIR in): cached rustc calls across builds.
+  if command -v sccache >/dev/null && [ -z "${RUSTC_WRAPPER:-}" ]; then export RUSTC_WRAPPER=sccache; fi
+  CARGO_TARGET_DIR=$srcdir/target cargo build -p wolkit --release --locked -j"${CARGO_BUILD_JOBS:-$_j}"
+  # The shared object from the staticlib: wolkit.map alone decides what is exported.
+  crates/wolkit/link.sh "$srcdir/target/release/libwolkit.a" "$srcdir/lib"
+  if [ "${RUSTC_WRAPPER:-}" = sccache ]; then sccache --show-stats || true; fi
+}
+
+check() {
+  local _repo=$srcdir/wolos
+  cd "$_repo"
+  # The ABI promise (every shipped symbol, declaration, constant and property id still there), the
+  # C program on the headless backend, the conformance suite over every backend, the allocation
+  # budget and the patch decoder's property test. The Crystal binding runs in the wolos CI.
+  CARGO_TARGET_DIR=$srcdir/target cargo test -p wolkit --release --locked \
+    --test abi --test c_hello --test conformance --test alloc_free --test patch_fuzz
+}
+
+package() {
+  local _repo=$srcdir/wolos
+  install -Dm755 "$srcdir/lib/libwolkit.so.1" "$pkgdir/usr/lib/libwolkit.so.1"
+  ln -s libwolkit.so.1 "$pkgdir/usr/lib/libwolkit.so"
+  install -Dm644 "$_repo/crates/wolkit/include/wolkit.h" "$pkgdir/usr/include/wolkit.h"
+  # The style compiler `wol app build` runs (.wolcss -> WSB1 table + typed Crystal class ids).
+  install -Dm755 "$srcdir/target/release/wolkit-stylec" "$pkgdir/usr/bin/wolkit-stylec"
+  install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

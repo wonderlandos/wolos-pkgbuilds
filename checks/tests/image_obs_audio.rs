@@ -35,11 +35,23 @@ fn recipe_pins_one_upstream_commit_for_obs_33() {
         "DESTDIR=\"$pkgdir\" cmake --install build",
         "license=(GPL-2.0-or-later)",
     ] {
-        assert!(p.lines().any(|l| l.trim() == want), "PKGBUILD lacks `{want}`");
+        assert!(
+            p.lines().any(|l| l.trim() == want),
+            "PKGBUILD lacks `{want}`"
+        );
     }
-    assert!(p.contains("-DCMAKE_INSTALL_LIBDIR=lib"), "Arch's lib, not lib64");
-    assert!(!p.contains("archive/refs/tags"), "a tag tarball can move; the commit cannot");
-    assert!(!p.contains("$pkgdir/usr\""), "install through DESTDIR, not a prefix inside pkgdir");
+    assert!(
+        p.contains("-DCMAKE_INSTALL_LIBDIR=lib"),
+        "Arch's lib, not lib64"
+    );
+    assert!(
+        !p.contains("archive/refs/tags"),
+        "a tag tarball can move; the commit cannot"
+    );
+    assert!(
+        !p.contains("$pkgdir/usr\""),
+        "install through DESTDIR, not a prefix inside pkgdir"
+    );
 }
 
 #[test]

@@ -1,16 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Reusable: testing -> stable, after a release passed its VM test (wolos-iso release.yml). Every
 # package [wolos-testing] serves goes into [wolos] (release wolos-<snapshot>, the server in
-# wolos-mirrorlist), re-indexed and signed (wolos-build publish stable), and to the CDN's bucket
-# (s3://wolos-repo/<tag>/, wolos-build repo_push, then a CloudFront invalidation: vars.WOLOS_CDN_DIST).
+# wolos-mirrorlist), re-indexed and signed with testing's inputs.json, then the CDN's bucket
+# (s3://wolos-repo/<tag>/ and a CloudFront invalidation: vars.WOLOS_CDN_DIST): all of it is
+# `wolos-build publish --run promote-<run id> stable` (lib/publish.sh in wolos-build, from the
+# builder image). A package already in [wolos] under the same file name stays as published.
 # Called only by wonderlandos/wolos .github/workflows/publish.yml (what=promote), the one repo that
 # holds the keys (explicit secrets); OIDC subject = wolos main, so vars.* are wolos's.
-# The signed repo goes to s3://$BUCKET/runs/promote-<run id>/signed/ and an artifact. With
-# secrets.WOLOS_RELEASES_TOKEN it is uploaded and copied to the CDN's bucket; without it (the
-# documented hand mode) the release writes are recorded in .../gh-release.sh and a ::notice:: gives
+# The signed repo also goes to s3://$BUCKET/runs/promote-<run id>/signed/ and an artifact. With
+# secrets.WOLOS_RELEASES_TOKEN it is uploaded and copied to the CDN's bucket; without it (hand
+# mode, WOLOS_GH_RECORD) the release writes are recorded in .../gh-release.sh and a ::notice:: gives
 # main the upload command and the what=cdn dispatch to run after it. No WOLOS_GPG_KEY is always an error.
 # Secrets: WOLOS_GPG_KEY, WOLOS_RELEASES_TOKEN (optional). Variables: AWS_ROLE_ARN, AWS_REGION, BUCKET,
-# WOLOS_CDN_DIST, WOLOS_RELEASES_REPO. The tool: the builder image (.github/builder).
+# WOLOS_CDN_DIST, WOLOS_REPO_BUCKET, WOLOS_RELEASES_REPO. The tool: the builder image (.github/builder).
 name: promote
 
 on:
@@ -25,6 +27,11 @@ permissions:
   contents: read
   id-token: write   # ECR (the builder image), S3, OIDC
 
+# Every run: script is bash -eo pipefail (a failing stage of a pipeline fails the step).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -32,17 +39,32 @@ jobs:
     # repo (wolos, Settings > Environments > release). Signing secrets are passed explicitly.
     environment: release
     env:
-      RUN: promote-${{ github.run_id }}
+      WOLOS_RUN: promote-${{ github.run_id }}
       BUCKET: ${{ vars.BUCKET }}
       GH_REPO: ${{ vars.WOLOS_RELEASES_REPO || 'wonderlandos/wolos-packages' }}
       # The releases repo is public: the caller's token reads it; only writes need the releases token.
       GH_TOKEN: ${{ secrets.WOLOS_RELEASES_TOKEN || github.token }}
       UPLOAD: ${{ secrets.WOLOS_RELEASES_TOKEN != '' && '1' || '0' }}
+      WOLOS_CDN_DIST: ${{ vars.WOLOS_CDN_DIST }}
+      WOLOS_REPO_BUCKET: ${{ vars.WOLOS_REPO_BUCKET || 'wolos-repo' }}
     steps:
+      # I7-4: the signer runs from the commit of this workflow that the caller pinned in `uses:`
+      # (the OIDC claim job_workflow_sha), never a moving branch next to the key. github.sha is the
+      # caller's (wolos) commit, and a checkout of another repo without ref takes its default branch.
+      - name: This workflow's commit
+        id: self
+        run: |
+          sha=$(python3 -c 'import base64, json, os, urllib.request
+          r = urllib.request.Request(os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"], headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
+          p = json.load(urllib.request.urlopen(r))["value"].split(".")[1]
+          c = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)))
+          print(c["job_workflow_sha"] if c.get("job_workflow_ref", "").startswith("wonderlandos/wolos-pkgbuilds/") else "")')
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::no commit of wolos-pkgbuilds in the OIDC token (job_workflow_sha)"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: wonderlandos/wolos-pkgbuilds
-          ref: main
+          ref: ${{ steps.self.outputs.sha }}
           path: wolos-pkgbuilds
       - name: AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
@@ -56,56 +78,30 @@ jobs:
         run: |
           [ -n "$BUCKET" ] || { echo "::error::vars.BUCKET is not set in the calling repo"; exit 1; }
           mkdir -p out/testing
-          gh release download wolos-testing --dir out/testing --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig'
-          ls out/testing | tee -a "$GITHUB_STEP_SUMMARY"
+          gh release download wolos-testing --dir out/testing --pattern '*.pkg.tar.zst' --pattern '*.pkg.tar.zst.sig' \
+            --pattern 'inputs.json' --pattern '*.inputs.json'
+          find out/testing -maxdepth 1 -type f -printf '%f\n' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Sign, index, upload to [wolos], CDN
         env:
           GPG_KEY: ${{ secrets.WOLOS_GPG_KEY }}
-          WOLOS_CDN_DIST: ${{ vars.WOLOS_CDN_DIST }}
-          WOLOS_REPO_BUCKET: ${{ vars.WOLOS_REPO_BUCKET || 'wolos-repo' }}
-          WOLOS_GH_LOG: ${{ github.workspace }}/out/gh-release.sh
         run: |
           [ -n "$GPG_KEY" ] || { echo "::error::WOLOS_GPG_KEY is not set: [wolos] would be unsigned"; exit 1; }
-          mkdir -p out/ghshim; : > "$WOLOS_GH_LOG"
-          # Hand mode: a gh that reads the release for real and records its writes (create, upload,
-          # delete-asset) as commands for main; the CDN waits for the upload (--no-cdn, then what=cdn).
-          cat > out/ghshim/gh <<'SH'
-          #!/bin/sh
-          case "$1 $2" in
-            "release create"|"release upload"|"release delete-asset"|"release edit")
-              printf 'gh' >> "$WOLOS_GH_LOG"; for a; do printf " '%s'" "$a" >> "$WOLOS_GH_LOG"; done
-              echo >> "$WOLOS_GH_LOG"; exit 0 ;;
-          esac
-          exec /usr/local/bin/gh "$@"
-          SH
-          chmod +x out/ghshim/gh
-          if [ "$UPLOAD" = 1 ]; then export WOLOS_SHIM=; cdn=; else export WOLOS_SHIM=$PWD/out/ghshim; cdn=--no-cdn; fi
-          # gpg, repo-add and the tool: the builder image, with the runner's gh.
-          WOLOS_CDN=$cdn wolos-pkgbuilds/.github/builder bash -euo pipefail -c '
-              [ -z "$WOLOS_SHIM" ] || export PATH=$WOLOS_SHIM:$PATH
+          export WOLOS_SUMMARY=$PWD/out/summary.md
+          # Hand mode (no releases token): wolos-build records the release writes instead of running them.
+          [ "$UPLOAD" = 1 ] || export WOLOS_GH_RECORD=$PWD/out/gh-release.sh
+          echo "STAGE=$PWD/out/work/publish/wolos-$(tr -d '[:space:]' < wolos-pkgbuilds/snapshot)" >> "$GITHUB_ENV"
+          # shellcheck disable=SC2016 # single quotes on purpose: the builder's own bash expands these
+          wolos-pkgbuilds/.github/builder bash -euo pipefail -c '
               echo "$GPG_KEY" | gpg --batch --import
               export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")
-              WOLOS_PKGBUILDS=$PWD/wolos-pkgbuilds WOLOS_WORK=$PWD/out/work wolos-build publish $WOLOS_CDN stable out/testing
+              WOLOS_PKGBUILDS=$PWD/wolos-pkgbuilds WOLOS_WORK=$PWD/out/work wolos-build publish --run "$WOLOS_RUN" stable out/testing
             '
-          tag=wolos-$(tr -d '[:space:]' < wolos-pkgbuilds/snapshot)
-          stage=$PWD/out/work/publish/$tag
-          sed -i "s#'$stage/#'./#g" "$WOLOS_GH_LOG"
-          printf 'tag=%s\ndb=wolos\n' "$tag" > out/publish.env
-          aws s3 sync --quiet --delete "$stage/" "s3://$BUCKET/runs/$RUN/signed/"
-          aws s3 cp --quiet out/publish.env "s3://$BUCKET/runs/$RUN/publish.env"
-          aws s3 cp --quiet "$WOLOS_GH_LOG" "s3://$BUCKET/runs/$RUN/gh-release.sh"
-          echo "signed: s3://$BUCKET/runs/$RUN/signed/ ($(find "$stage" -maxdepth 1 -type f | wc -l) files, release $tag)" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "STAGE=$stage" >> "$GITHUB_ENV"
+          [ ! -f out/summary.md ] || cat out/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signed-wolos-${{ github.run_id }}
           path: |
             ${{ env.STAGE }}/
             out/gh-release.sh
+          if-no-files-found: ignore
           retention-days: 14
-      - name: Release upload by hand
-        if: env.UPLOAD != '1'
-        run: |
-          cmd="mkdir -p wolos-signed-$RUN && aws s3 sync s3://$BUCKET/runs/$RUN/signed/ wolos-signed-$RUN/ && aws s3 cp s3://$BUCKET/runs/$RUN/gh-release.sh wolos-signed-$RUN.sh && (cd wolos-signed-$RUN && GH_REPO=$GH_REPO sh -eux ../wolos-signed-$RUN.sh) && gh workflow run publish.yml -R wonderlandos/wolos -f what=cdn -f run=$RUN"
-          { echo "### Not uploaded: no WOLOS_RELEASES_TOKEN (hand mode)"; echo '```'; echo "$cmd"; echo '```'; echo '```'; cat out/gh-release.sh; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          echo "::notice title=Signed, not uploaded (no WOLOS_RELEASES_TOKEN)::Upload with your gh login, then copy to the CDN bucket: $cmd"

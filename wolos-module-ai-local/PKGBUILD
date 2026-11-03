@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-ai-local (ADR 0032, wolos docs/modules/modules.md): the "Local AI" optional module.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/ai-local.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package; nothing outside Arch is a dependency. User side (`wol modules enable ai-local`):
+# a check of the GPU backend; the backend package (ollama-cuda, -rocm or -vulkan) is added on the root side by modules-install / `wol modules install ai-local`.
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-ai-local
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Local AI module: Ollama, GPU backend from wol hw compute'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system ollama)
+install=wolos-module-ai-local.install
+
+package() {
+  # Nothing to install: the dependencies are the module.
+  :
+}

@@ -15,7 +15,7 @@ Config: Arch's `config.x86_64` + the fork's `kernel/configs/wolos.config` at the
 
 What users notice versus Arch's `linux`:
 - Anything that runs on stock Arch runs here: 32-bit apps and Steam, Wine/Proton, Flatpak/AppImage/Snap, Docker/Podman, KVM/VirtualBox, browser sandboxes, DKMS modules (NVIDIA, ZFS, v4l2loopback).
-- The app in front goes first. wold gives boosted classes a 2 ms EEVDF slice and writes the frontmost pid to `/sys/kernel/wolos/foreground_pid` on every switch; the kernel then gives it a CPU floor (`foreground_uclamp_min`, 512), exact timers (`foreground_timerslack_ns`, 0: Wine/Proton frame limiters wake on time), the i915 waitboost, a quiet core for its busiest thread and the top `scx_wolos` slot. Background threads coalesce wakeups (`background_timerslack_ns`, 50 ms).
+- The app in front goes first. wold applies a QoS class per thread (nice and uclamp through `sched_setattr`, 2 ms EEVDF slice for the boosted classes) and writes the frontmost pid to `/sys/kernel/wolos/foreground_pid` on every switch; the kernel uses that pid for the i915 waitboost (only the app in front raises GPU clocks) and to protect it in OOM victim choice. A key, click or pointer move also lifts the CPU floor for 100 ms (input boost).
 - Removed (`abi-removed.txt`): the x32 ABI, legacy PTYs and the vsyscall page (boot with `vsyscall=xonly` for pre-2011 static binaries), plus pre-2010 PC hardware (PCMCIA/CardBus, floppy, parallel port, gameport, 1990s PCI NICs, pre-ACPI MP tables), the VESA/EFI framebuffers (simpledrm covers boot), cluster sockets (RDS, TIPC, RxRPC/AFS) and raw-flash filesystems. Datacenter-only drivers are not built.
 - Module ABI is stable within a release line (CONFIG_MODVERSIONS): vendor modules built once keep loading until the next line.
 - `uname -r` ends in `-wolos`; `uname -v` reads `#1 WolKernel 1.0 Linux 7.3 SMP PREEMPT_DYNAMIC <date>`.
@@ -24,14 +24,14 @@ What is in 1.0 (each has an off switch; table with sources in `README.wolos.md` 
 
 | area | change |
 |---|---|
-| scheduler | `scx_wolos` (sched_ext): per-CPU queues, stealing within the shared cache first, QoS slices (1/2/4 ms), frontmost boost from `foreground_pid`; BORE and an interactivity-tuned EEVDF when it is not loaded |
-| frontmost app | CPU floor and exact timers for the app in front, timer coalescing behind (WolOS code) |
+| scheduler | stock EEVDF with the QoS classes above. The `scx_wolos` sched_ext scheduler (per-CPU queues, QoS slices, frontmost boost) is built and tested in `kernel/scx_wolos/` of the wolos repo but is **not shipped in v0.12**: no package installs it and no service starts it. To try it by hand: `make -C kernel/scx_wolos KSRC=<tree of the wolkernel tag> VMLINUX_BTF=/sys/kernel/btf/vmlinux`, then `sudo kernel/scx_wolos/build/scx_wolos` (the running kernel must be this WolKernel; details in `kernel/README.md`) |
+| frontmost app | i915 waitboost only for the app in front; OOM victim choice favours it; input boost (CPU floor for 100 ms after input) |
 | locks | futex spins briefly before sleeping (`futex.spin_ns`); `selftests/wolos/futex_pingpong` measures it |
-| games | NTSYNC and futex_waitv built in; split-lock mitigation off; i915 frame-deadline boost |
-| memory | zswap in front of zram (lz4/zstd, writeback, `page-cluster` 0), MGLRU working-set protection, no watermark boosting or proactive compaction, THP on request |
-| disk | ADIOS I/O scheduler by default; none on NVMe, BFQ on spinning disks (udev) |
-| network | BBRv3 with fq by default, MPTCP and WireGuard built in |
-| graphics | AMD color management (HDR) properties; parallel CPU bring-up at boot |
+| games | NTSYNC (module) and `futex_waitv` (always built); split-lock mitigation off (sysctl `kernel.split_lock_mitigate=0`); i915 frame-deadline boost |
+| memory | zswap in front of zram (zstd, zram writeback built), MGLRU on, `page-cluster` 0 (sysctl), THP on request |
+| disk | I/O scheduler by udev rule: none on NVMe, mq-deadline on SATA SSDs and SD cards, BFQ on spinning disks |
+| network | BBR with fq by default, MPTCP built in, WireGuard as a module |
+| graphics | i915 deadline boost (above); AMD color pipeline and parallel CPU bring-up are the base kernel's own |
 | build | `-O3`, x86-64-v3/v4 flavours, Clang ThinLTO, zstd modules, ccache (options below) |
 
 Measured (7.3.0, `make olddefconfig`, before the 1.0 trim): Arch 6332 modules / 3247 built-in options; WolKernel 6154 / 3164 (-178 modules, -83 built-in).

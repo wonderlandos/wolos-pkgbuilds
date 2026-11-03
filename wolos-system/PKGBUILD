@@ -3,7 +3,7 @@
 # binaries (tools/build-rust.sh), Hyprland plugins (desktop/hyprland/build-plugins.sh), desktop/overlay,
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
-pkgver=0.11.5  # the newest CHANGELOG.md entry at _wolos_commit
+pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
 pkgrel=1
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
@@ -11,9 +11,10 @@ url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later CC-BY-NC-ND-4.0)
 # plymouth: installed first, so post_install can make the WolOS splash the theme.
 # nftables: etc/wolos/nftables.conf runs nft; libnautilus-extension: the Files "Analyze with ClamAV"
-# extension (usr/lib/nautilus/extensions-4/libwolos-analyze.so) links it.
+# extension (usr/lib/nautilus/extensions-4/libwolos-analyze.so) links it. arch-audit: the CVE list
+# usr/lib/wolos/update-check writes (Settings > Updates, Security); without it that list is absent.
 depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plymouth nftables
-  libnautilus-extension)
+  libnautilus-extension arch-audit)
 # Our cursor theme is the default one (usr/share/icons/default).
 provides=(default-cursors)
 conflicts=(default-cursors)
@@ -21,13 +22,14 @@ replaces=(default-cursors)
 makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus pipewire)
 options=(!debug !lto)
 backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf
-  etc/zsh/zshenv)
+  etc/zsh/zshenv etc/zellij/config.kdl etc/mise/config.toml etc/fish/conf.d/wolos.fish
+  etc/profile.d/wolos-console.sh)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
-_wolos_commit=1dcdea6e08525ce031d3b0587bdf850e2a0916c0
+_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=743d616a733b8e91b86a10e735e41f180352dfb3
-_shell_commit=622a20a17321dfa9498237256a410b00b5f6f3b7
+_shell_commit=1d1e966c8da4e16490a7aaeec5d2974f891a8174
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
   "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
   "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
@@ -47,6 +49,8 @@ build() {
   export CARGO_TARGET_DIR=$srcdir/target
   "$_repo/tools/build-rust.sh" "$srcdir/stage"
   "$_repo/desktop/hyprland/build-plugins.sh" "$srcdir/stage"
+  # build-rust.sh compiles through sccache (a makedepend; SCCACHE_DIR from wolos-build): its hit rate.
+  if command -v sccache >/dev/null; then sccache --show-stats || true; fi
   # The stage has usr/local/bin/pacman (build-rust.sh: the sealed system's pacman, first on PATH,
   # runs the real /usr/bin/pacman; ADR 0016). namcap flags /usr/local; kept, as published.
 }
@@ -81,4 +85,5 @@ package() {
   fi
   # Rust and GPL-3.0 shell licenses travel with the package.
   install -Dm644 "$_repo/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$_repo/docs/THIRD-PARTY.md" "$pkgdir/usr/share/licenses/$pkgname/THIRD-PARTY.md"
 }

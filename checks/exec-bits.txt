@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Every file of this repo whose first line is a `#!` shebang, one repo-relative path per line: each
+# is committed with mode 100755.
+# Why: the repo runs with core.filemode=false (checked out on Windows), so a plain `git add` records
+# a new script as 100644 and a Linux checkout cannot run it (audit5 X6-3; wolos-build runs
+# wolos-base/prebuild.sh only when it is executable). How: add a new script here and commit it with
+# `git add --chmod=+x <path>` (an existing one: `git update-index --chmod=+x <path>`);
+# checks/tests/exec_bits.rs fails when a shebang file is missing here, a listed file is gone or has
+# no shebang, or the git index holds a listed file as 100644.
+.github/builder
+helium-browser/helium.sh
+linux-wolos/kmi/kmi.sh
+linux-wolos/prepare.sh
+tools/bump-kernel.sh
+tools/bump-snapshot.sh
+tools/bump-wolos.sh
+tools/lint.sh
+wolos-base/base-manifest.sh
+wolos-base/prebuild.sh

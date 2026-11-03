@@ -11,3 +11,5 @@
 */Hyprland-*.tar.gz
 wolos-base/base.manifest
 checks/target/
+__pycache__/
+*.pyc

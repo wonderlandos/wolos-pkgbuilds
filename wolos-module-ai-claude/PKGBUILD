@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-ai-claude (ADR 0032, wolos docs/modules/modules.md): the "AI Assistants" optional module.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/ai-claude.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package; nothing outside Arch is a dependency. Its one file is Claude Code's system-wide policy,
+# /etc/claude-code/managed-settings.json (ADR 0032): only a machine with the module has it, not every
+# WolOS machine. package() writes it, so the package still has no sources and builds nothing
+# (checks/tests/modules_files.rs runs package() and checks the file). User side
+# (`wol modules enable ai-claude`):
+# Claude Code itself (wopkg recipe claude-code), the `wol mcp` registration and the WolOS skill link.
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-ai-claude
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS AI module: Claude Code acting through wol mcp, with git, ripgrep and zellij'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system git ripgrep zellij)
+backup=(etc/claude-code/managed-settings.json)
+
+package() {
+  # The policy: allow the wol mcp tools (WolOS's own gate asks, so Claude does not ask twice), deny the
+  # escalation tools (root goes through wol-admind only), stay on the stable channel. No server
+  # allow-list: people keep their own MCP servers.
+  install -d "$pkgdir/etc/claude-code"
+  cat >"$pkgdir/etc/claude-code/managed-settings.json" <<'JSON'
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "mcp__wolos"
+    ],
+    "deny": [
+      "Bash(sudo:*)",
+      "Bash(su:*)",
+      "Bash(pkexec:*)",
+      "Bash(run0:*)",
+      "Bash(doas:*)"
+    ]
+  },
+  "autoUpdatesChannel": "stable"
+}
+JSON
+  chmod 644 "$pkgdir/etc/claude-code/managed-settings.json"
+}

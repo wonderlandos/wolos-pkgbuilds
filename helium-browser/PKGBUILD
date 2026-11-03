@@ -6,7 +6,7 @@
 # desktop file and the icon. WolOS settings (policies, first-run preferences) come from wolos-system.
 pkgname=helium-browser
 pkgver=0.20.2.1
-pkgrel=1
+pkgrel=2
 pkgdesc='Helium web browser (Chromium based), WolOS default'
 arch=(x86_64)
 url='https://github.com/imputnet/helium-linux'

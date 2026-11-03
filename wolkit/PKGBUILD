@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolkit: the WolOS UI kit for Crystal (ADR 0039), the shard over libwolkit from
+# wolos-crystal/shards/wolkit of github.com/wonderlandos/wolos: the DSL and reactive runtime under
+# /usr/lib/wolos/crystal/wolkit (so `require "wolkit"` works on that CRYSTAL_PATH entry), its default
+# look (styles/), the wolkit-new and kit-styles tools, and the app template `wol app new` reads
+# (/usr/share/wolos/templates/app). The shard's own `make install` decides the layout.
+pkgname=wolkit
+pkgver=0.1.0  # version: of wolos-crystal/shards/wolkit/shard.yml at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS UI kit for Crystal: the wolkit shard, its default look and the app template'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(BSD-2-Clause)
+# The shard is built on cryswol (Wol::Handle, Wol.background); apps built with it link libwolkit and
+# libwol and compile with wolkit-stylec (libwolkit).
+depends=(crystal cryswol libwolkit libwol)
+makedepends=(git)
+options=(!debug)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). The shard is plain Crystal
+# source: no submodule is needed to install or check it.
+_wolos_commit=968ab4f4d39adfdeb73c0c9b1e84a3c8244105e6
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+check() {
+  cd "$srcdir/wolos/wolos-crystal/shards/wolkit"
+  # The specs that need no engine: reactive core, patch encoder, DSL expansion, the compile-fail
+  # specs, the tutorial programs and the template. The engine specs run in the wolos CI.
+  make spec-core
+}
+
+package() {
+  cd "$srcdir/wolos/wolos-crystal/shards/wolkit"
+  make install DESTDIR="$pkgdir" PREFIX=/usr
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
