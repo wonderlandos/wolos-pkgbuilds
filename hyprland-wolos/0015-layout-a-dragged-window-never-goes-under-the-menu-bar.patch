@@ -59,18 +59,18 @@ index 015088e..df88261 100644
      inline constexpr std::string_view HIDDEN = "special:hidden";
  
 diff --git a/src/layout/supplementary/DragController.cpp b/src/layout/supplementary/DragController.cpp
-index d73a3a8..9293d62 100644
+index 5d64764..f97379c 100644
 --- a/src/layout/supplementary/DragController.cpp
 +++ b/src/layout/supplementary/DragController.cpp
-@@ -13,6 +13,7 @@
- #include "../../protocols/XDGShell.hpp"
+@@ -17,6 +17,7 @@
+ #include "../../desktop/view/Group.hpp"
  #include "../../render/Renderer.hpp"
  #include "../../state/MonitorState.hpp"
 +#include "../../helpers/WolosWindow.hpp"
  
+ #include <hyprutils/utils/ScopeGuard.hpp>
  #include <string_view>
- 
-@@ -367,6 +368,29 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
+@@ -406,6 +407,29 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
          if (*SNAPENABLED && !m_draggingTiled)
              g_layoutManager->performSnap(newPos, newSize, DRAGGINGTARGET, MBIND_MOVE, -1, m_beginDragSizeXY);
  

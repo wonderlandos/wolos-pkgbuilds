@@ -3,7 +3,8 @@
 //! with the realtime geometry/curves and the kit: 12 px window controls on the right, close
 //! rightmost (centre 22.5 px in from the right edge), then zoom and minimise 22 px apart leftward.
 //! Live 0.56.2: the controls were green-yellow-red, 20 px apart, CSD apps got a second bar, and the
-//! open animation used a 400 ms overshooting spring instead of our ease-out.
+//! open animation used a 400 ms overshooting spring instead of our ease-out. The 0.57 series reads
+//! only hyprland.lua; hyprland.conf ships beside it until every writer has switched.
 #![allow(dead_code, unused_imports)]
 #[path = "support/siblings.rs"]
 mod siblings;
@@ -46,19 +47,36 @@ fn session_starts_hyprland_without_nag_banners() {
         .unwrap();
     // On the user bus inside a logind session, else a private bus: always through start-hyprland.
     assert_eq!(launch, "exec ${bus:+$bus --} start-hyprland");
-    // hyprland-guiutils is not in the image: its "missing" banner must be off.
+    // hyprland-guiutils is not in the image: its "missing" banner must be off (both forms).
     assert_eq!(value("disable_hyprland_guiutils_check"), "true");
-    let dir = format!("{}/hyprland-wolos", siblings::root_str());
-    let patches: String = std::fs::read_dir(dir)
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|x| x == "patch"))
-        .map(|p| std::fs::read_to_string(p).unwrap())
-        .collect();
     assert!(
-        patches.lines().any(|l| l.starts_with('-') && l.contains("TXT_KEY_NOTIF_OUTDATED_CONFIG), CHyprColor")),
-        "fork patch must drop the .conf deprecation notification (0.56 pin keeps .conf)"
+        lua()
+            .lines()
+            .any(|l| l.trim() == "disable_hyprland_guiutils_check = true,"),
+        "hyprland.lua keeps the guiutils banner off"
     );
+    // The 0.57 series reads only Lua, so there is no `.conf` banner to drop (the 0.56 series'
+    // patch 0003 is gone): the session's user file loads the shipped hyprland.lua.
+    let pkgver =
+        std::fs::read_to_string(format!("{}/hyprland-wolos/PKGBUILD", siblings::root_str()))
+            .unwrap()
+            .lines()
+            .find_map(|l| l.strip_prefix("pkgver=").map(str::to_owned))
+            .unwrap();
+    assert!(pkgver.starts_with("0.57."), "{pkgver}");
+    assert!(
+        session.contains("require(\"$share/hypr/hyprland.lua\")"),
+        "wol-session writes the Lua user file"
+    );
+}
+
+/// wolos desktop/overlay/usr/share/wolos/hypr/hyprland.lua: the compositor 0.57 configuration.
+fn lua() -> String {
+    let p = format!(
+        "{}/desktop/overlay/usr/share/wolos/hypr/hyprland.lua",
+        siblings::root_str()
+    );
+    std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{p}: {e}"))
 }
 
 /// Live: libadwaita drew Text Editor's minimise light disabled; Hyprland 0.56 never advertised
@@ -74,7 +92,8 @@ fn fork_makes_client_minimise_real() {
         .collect();
     let added = |s: &str| patches.lines().any(|l| l.starts_with('+') && l.contains(s));
     assert!(added("XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE"));
-    assert!(added("requestsMinimize") && added("special:hidden"));
+    // 0.57: the window backend hands the client's request over as `minimized`.
+    assert!(added("request.minimized") && added("special:hidden"));
 }
 
 /// Live: `focuswindow` (switcher, menu actions) focused a floating window but left it behind

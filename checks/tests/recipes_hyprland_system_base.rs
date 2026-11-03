@@ -27,7 +27,7 @@ fn hyprland_fork_and_system_package_recipes() {
         "pkgname=hyprland-wolos",
         "provides=(hyprland",
         "conflicts=(hyprland",
-        "pkgver=0.56.2",
+        "pkgver=0.57.1",
         "patch -Np1",
     ] {
         assert!(h.contains(want), "hyprland-wolos lacks {want}");

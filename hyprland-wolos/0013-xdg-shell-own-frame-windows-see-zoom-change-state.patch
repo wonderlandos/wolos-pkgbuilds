@@ -1,4 +1,6 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: kleeedolinux <71413974+kleeedolinux@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 14:35:59 +0000
 Subject: [PATCH] xdg-shell: decorated toplevels see zoom change state
 
 Every toplevel stays maximized from its first map so that it draws no shadow
@@ -9,43 +11,52 @@ client- or a server-side frame: Chromium, Qt, SDL) gets the state dropped for
 one configure, so its own maximized state follows zoom. GTK never creates a
 decoration object and keeps the sticky state: unmaximized, GTK draws shadow
 margins and rounded corners under the compositor's bar.
-
 ---
---- a/src/desktop/view/Window.cpp
-+++ b/src/desktop/view/Window.cpp
-@@ -45,6 +45,8 @@
- #include "../../managers/eventLoop/EventLoopTimer.hpp"
- #include "../../protocols/XDGShell.hpp"
- #include "../../protocols/core/Compositor.hpp"
-+#include "../../protocols/XDGDecoration.hpp"
-+#include "../../managers/eventLoop/EventLoopManager.hpp"
- #include "../../protocols/core/Subcompositor.hpp"
- #include "../../protocols/ContentType.hpp"
- #include "../../protocols/LayerShell.hpp"
-@@ -1444,6 +1446,20 @@
-                 Fullscreen::controller()->setFullscreenMode(window, std::nullopt, Fullscreen::FSMODE_NONE);
-             else if (CLIENT_STATE == Fullscreen::FSMODE_NONE)
-                 Fullscreen::controller()->setFullscreenMode(window, std::nullopt, Fullscreen::FSMODE_MAXIMIZED);
+ src/desktop/view/window/WaylandBackend.cpp | 16 ++++++++++++++++
+ src/protocols/XDGDecoration.hpp            |  6 ++++++
+ src/protocols/XDGShell.cpp                 |  4 ++++
+ src/protocols/XDGShell.hpp                 |  1 +
+ 4 files changed, 27 insertions(+)
+
+diff --git a/src/desktop/view/window/WaylandBackend.cpp b/src/desktop/view/window/WaylandBackend.cpp
+index ab58a48..4cd06aa 100644
+--- a/src/desktop/view/window/WaylandBackend.cpp
++++ b/src/desktop/view/window/WaylandBackend.cpp
+@@ -6,6 +6,8 @@
+ #include "../popup/WaylandPopupBackend.hpp"
+ #include "../../../protocols/XDGDialog.hpp"
+ #include "../../../protocols/XDGShell.hpp"
++#include "../../../protocols/XDGDecoration.hpp"
++#include "../../../managers/eventLoop/EventLoopManager.hpp"
+ #include "../../../protocols/core/Compositor.hpp"
+ #include "managers/fullscreen/FullscreenController.hpp"
+ #include "managers/fullscreen/FullscreenTypes.hpp"
+@@ -186,6 +188,20 @@ CWaylandBackend::CWaylandBackend(SP<CXDGSurfaceResource> resource) : m_resource(
+                 .maximized         = requestsMaximize,
+                 .minimized         = TOPLEVEL->m_state.requestsMinimize,
+             });
 +
 +            // WolOS: every toplevel stays "maximized" from its first map so that it draws no shadow
 +            // margins, so zooming changes no state a client can see. Chromium and Electron then
 +            // ignore their next zoom click. Toplevels with a decoration object (client- or
 +            // server-side frame) get the state dropped for one configure; GTK (none) would flash shadows.
-+            const auto TOPLEVEL = m_xdgSurface ? m_xdgSurface->m_toplevel.lock() : nullptr;
-+            if (TOPLEVEL && PROTO::xdgDecoration->seesZoomState(TOPLEVEL->wlToplevel())) {
++            const auto WINDOW = m_window.lock();
++            if (REQUESTED_MAXIMIZE && WINDOW && WINDOW->mapped() && PROTO::xdgDecoration->seesZoomState(TOPLEVEL->wlToplevel())) {
 +                TOPLEVEL->setMaximized(false);
-+                g_pEventLoopManager->doLater([w = m_self] {
-+                    const auto W = w.lock();
-+                    if (W && W->m_xdgSurface && W->m_xdgSurface->m_toplevel)
-+                        W->m_xdgSurface->m_toplevel->setMaximized(true);
++                g_pEventLoopManager->doLater([r = m_resource] {
++                    const auto R = r.lock();
++                    if (R && R->m_toplevel)
++                        R->m_toplevel->setMaximized(true);
 +                });
 +            }
-         }
-     }
- }
+         });
+         m_listeners.sizeLimits = TOPLEVEL->m_events.sizeLimitsChanged.listen([this] {
+             updateGeometryHints();
+diff --git a/src/protocols/XDGDecoration.hpp b/src/protocols/XDGDecoration.hpp
+index 7e8b6ab..ca77ab2 100644
 --- a/src/protocols/XDGDecoration.hpp
 +++ b/src/protocols/XDGDecoration.hpp
-@@ -26,6 +26,12 @@
+@@ -26,6 +26,12 @@ class CXDGDecoration {
  
  class CXDGDecorationProtocol : public IWaylandProtocol {
    public:
@@ -58,9 +69,11 @@ margins and rounded corners under the compositor's bar.
      CXDGDecorationProtocol(const wl_interface* iface, const int& ver, const std::string& name);
  
      virtual void bindManager(wl_client* client, void* data, uint32_t ver, uint32_t id);
+diff --git a/src/protocols/XDGShell.cpp b/src/protocols/XDGShell.cpp
+index 66f5ea6..5d0c76a 100644
 --- a/src/protocols/XDGShell.cpp
 +++ b/src/protocols/XDGShell.cpp
-@@ -360,6 +360,10 @@
+@@ -396,6 +396,10 @@ uint32_t CXDGToplevelResource::setSize(const Vector2D& size) {
      return m_owner->scheduleConfigure();
  }
  
@@ -71,9 +84,11 @@ margins and rounded corners under the compositor's bar.
  uint32_t CXDGToplevelResource::setMaximized(bool maximized) {
      bool set = std::ranges::find(m_pendingApply.states, XDG_TOPLEVEL_STATE_MAXIMIZED) != m_pendingApply.states.end();
  
+diff --git a/src/protocols/XDGShell.hpp b/src/protocols/XDGShell.hpp
+index 85a06ef..88668ae 100644
 --- a/src/protocols/XDGShell.hpp
 +++ b/src/protocols/XDGShell.hpp
-@@ -115,6 +115,7 @@
+@@ -115,6 +115,7 @@ class CXDGToplevelResource {
  
      // schedule a configure event
      uint32_t setSize(const Vector2D& size);

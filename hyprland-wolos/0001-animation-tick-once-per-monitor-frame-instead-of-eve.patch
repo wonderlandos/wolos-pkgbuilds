@@ -18,7 +18,7 @@ gtest in tests/helpers/WolosPerf.cpp.
  create mode 100644 tests/helpers/WolosPerf.cpp
 
 diff --git a/src/animation/AnimationManager.cpp b/src/animation/AnimationManager.cpp
-index 7742d2f..c2fee5d 100644
+index 321c074..af5b9d8 100644
 --- a/src/animation/AnimationManager.cpp
 +++ b/src/animation/AnimationManager.cpp
 @@ -1,4 +1,5 @@
@@ -27,7 +27,7 @@ index 7742d2f..c2fee5d 100644
  #include "../Compositor.hpp"
  #include "../desktop/DesktopTypes.hpp"
  #include "../helpers/AnimatedVariable.hpp"
-@@ -373,7 +374,13 @@ void CHyprAnimationManager::scheduleTick() {
+@@ -377,7 +378,13 @@ void CHyprAnimationManager::scheduleTick() {
          return;
      }
  

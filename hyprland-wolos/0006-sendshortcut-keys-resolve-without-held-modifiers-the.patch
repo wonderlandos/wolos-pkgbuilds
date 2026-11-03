@@ -1,4 +1,4 @@
-From 2c35d3554d5044e480e41c2907c0a11ebe816478 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: klee <71413974+kleeedolinux@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 09:22:20 -0300
 Subject: [PATCH] sendshortcut: keys resolve without held modifiers; the tap
@@ -13,54 +13,19 @@ and the held Super until the next real modifier change. Policy in WolosKeys.hpp.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/config/legacy/DispatcherTranslator.cpp  | 17 ++-----
  src/config/shared/actions/ConfigActions.cpp | 14 +++++-
  src/helpers/WolosKeys.hpp                   | 46 +++++++++++++++++
+ src/keybinds/Resolver.cpp                   | 18 ++-----
  tests/helpers/WolosKeys.cpp                 | 56 +++++++++++++++++++++
- 4 files changed, 119 insertions(+), 14 deletions(-)
+ 4 files changed, 119 insertions(+), 15 deletions(-)
  create mode 100644 src/helpers/WolosKeys.hpp
  create mode 100644 tests/helpers/WolosKeys.cpp
 
-diff --git a/src/config/legacy/DispatcherTranslator.cpp b/src/config/legacy/DispatcherTranslator.cpp
-index b534fec..f645231 100644
---- a/src/config/legacy/DispatcherTranslator.cpp
-+++ b/src/config/legacy/DispatcherTranslator.cpp
-@@ -16,6 +16,7 @@
- 
- #include <hyprutils/string/String.hpp>
- #include <hyprutils/string/VarList2.hpp>
-+#include "../../helpers/WolosKeys.hpp"
- using namespace Hyprutils::String;
- 
- using namespace Config;
-@@ -557,18 +558,10 @@ static SDispatchResult sendshortcut(const std::string& args) {
-         const auto KEYPAIRSTRING = std::format("{}{}", rc<uintptr_t>(KB.get()), KEY);
- 
-         if (!g_pKeybindManager->m_keyToCodeCache.contains(KEYPAIRSTRING)) {
--            xkb_keymap*   km          = KB->m_xkbKeymap;
--            xkb_state*    ks          = KB->m_xkbState;
--            xkb_keycode_t keycode_min = xkb_keymap_min_keycode(km);
--            xkb_keycode_t keycode_max = xkb_keymap_max_keycode(km);
--
--            for (xkb_keycode_t kc = keycode_min; kc <= keycode_max; ++kc) {
--                xkb_keysym_t sym = xkb_state_key_get_one_sym(ks, kc);
--                if (sym == KEYSYM) {
--                    keycode                                            = kc;
--                    g_pKeybindManager->m_keyToCodeCache[KEYPAIRSTRING] = keycode;
--                }
--            }
-+            // WolOS: no held modifier changes the key (⇧⌘Z), other layouts are searched too.
-+            keycode = WolosKeys::keycodeFor(KB->m_xkbKeymap, KEYSYM, KB->m_modifiersState.group);
-+            if (keycode)
-+                g_pKeybindManager->m_keyToCodeCache[KEYPAIRSTRING] = keycode;
- 
-             if (!keycode)
-                 return {.success = false, .error = "sendshortcut: key not found"};
 diff --git a/src/config/shared/actions/ConfigActions.cpp b/src/config/shared/actions/ConfigActions.cpp
-index cf38816..3ccb762 100644
+index 3ae9a54..f6e1555 100644
 --- a/src/config/shared/actions/ConfigActions.cpp
 +++ b/src/config/shared/actions/ConfigActions.cpp
-@@ -35,6 +35,7 @@
+@@ -45,6 +45,7 @@
  #include <numbers>
  #include <utility>
  #include <type_traits>
@@ -68,11 +33,11 @@ index cf38816..3ccb762 100644
  
  using namespace Config;
  using namespace Config::Actions;
-@@ -1551,7 +1552,15 @@ ActionResult Actions::pass(uint32_t modMask, uint32_t key, std::optional<PHLWIND
+@@ -1607,7 +1608,15 @@ ActionResult Actions::pass(Input::ModifierMask modMask, uint32_t key, std::optio
              window = nullptr;
      }
  
--    g_pSeatManager->sendKeyboardMods(modMask, 0, 0, 0);
+-    g_pSeatManager->sendKeyboardMods(g_pSeatManager->m_keyboard ? g_pInputManager->hyprlandModsToXkb(g_pSeatManager->m_keyboard.lock(), modMask) : 0, 0, 0, 0);
 +    // WolOS: the tap keeps the user's layout; afterwards the client gets the real modifiers back (WolosKeys).
 +    const auto             KB   = g_pSeatManager->m_keyboard.lock();
 +    const WolosKeys::SMods REAL = KB ? WolosKeys::SMods{.depressed = KB->m_modifiersState.depressed,
@@ -80,12 +45,12 @@ index cf38816..3ccb762 100644
 +                                                        .locked    = KB->m_modifiersState.locked,
 +                                                        .group     = KB->m_modifiersState.group} :
 +                                       WolosKeys::SMods{};
-+    const auto             TAP  = WolosKeys::tapMods(modMask, REAL);
++    const auto             TAP  = WolosKeys::tapMods(KB ? g_pInputManager->hyprlandModsToXkb(KB, modMask) : 0, REAL);
 +    g_pSeatManager->sendKeyboardMods(TAP.depressed, TAP.latched, TAP.locked, TAP.group);
  
      if (S.m_passPressed == 1) {
          if (!isMouse)
-@@ -1573,7 +1582,8 @@ ActionResult Actions::pass(uint32_t modMask, uint32_t key, std::optional<PHLWIND
+@@ -1629,7 +1638,8 @@ ActionResult Actions::pass(Input::ModifierMask modMask, uint32_t key, std::optio
          }
      }
  
@@ -147,6 +112,42 @@ index 0000000..e3ea104
 +        return real;
 +    }
 +}
+diff --git a/src/keybinds/Resolver.cpp b/src/keybinds/Resolver.cpp
+index 3263acd..5e20b35 100644
+--- a/src/keybinds/Resolver.cpp
++++ b/src/keybinds/Resolver.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "../devices/IKeyboard.hpp"
+ #include "../managers/SeatManager.hpp"
++#include "../helpers/WolosKeys.hpp"
+ 
+ #include <hyprutils/string/String.hpp>
+ 
+@@ -66,19 +67,10 @@ std::expected<uint32_t, std::string> CResolver::resolveKeycode(const std::string
+     if (const auto IT = m_keyToCodeCache.find(KEYPAIRSTRING); IT != m_keyToCodeCache.end())
+         return IT->second;
+ 
+-    xkb_keymap*   km          = KB->m_xkbKeymap;
+-    xkb_state*    ks          = KB->m_xkbSymState;
+-    xkb_keycode_t keycode_min = xkb_keymap_min_keycode(km);
+-    xkb_keycode_t keycode_max = xkb_keymap_max_keycode(km);
+-    uint32_t      keycode     = 0;
+-
+-    for (xkb_keycode_t kc = keycode_min; kc <= keycode_max; ++kc) {
+-        xkb_keysym_t sym = xkb_state_key_get_one_sym(ks, kc);
+-        if (sym == KEYSYM) {
+-            keycode                         = kc;
+-            m_keyToCodeCache[KEYPAIRSTRING] = keycode;
+-        }
+-    }
++    // WolOS: no held modifier changes the key (⇧⌘Z), other layouts are searched too.
++    const uint32_t keycode = WolosKeys::keycodeFor(KB->m_xkbKeymap, KEYSYM, KB->m_modifiersState.group);
++    if (keycode)
++        m_keyToCodeCache[KEYPAIRSTRING] = keycode;
+ 
+     if (!keycode)
+         return std::unexpected("key not found");
 diff --git a/tests/helpers/WolosKeys.cpp b/tests/helpers/WolosKeys.cpp
 new file mode 100644
 index 0000000..c701ed2
@@ -209,6 +210,3 @@ index 0000000..c701ed2
 +    EXPECT_EQ(tapMods(0x4, real), (SMods{.depressed = 0x4, .latched = 0, .locked = 0, .group = 1}));
 +    EXPECT_EQ(afterTap(real), real);
 +}
--- 
-2.54.0
-

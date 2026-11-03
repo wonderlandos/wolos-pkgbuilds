@@ -16,7 +16,7 @@ WolosPerf::cursorTickerDelayMs, gtest in tests/helpers/WolosPerf.cpp.
  3 files changed, 13 insertions(+), 1 deletion(-)
 
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
-index 249f084..d3b31ae 100644
+index 4bbb606..d6d8f46 100644
 --- a/src/render/Renderer.cpp
 +++ b/src/render/Renderer.cpp
 @@ -1,4 +1,5 @@
@@ -25,7 +25,7 @@ index 249f084..d3b31ae 100644
  #include "../Compositor.hpp"
  #include "../helpers/math/Math.hpp"
  #include <algorithm>
-@@ -82,7 +83,8 @@ extern "C" {
+@@ -91,7 +92,8 @@ extern "C" {
  
  static int cursorTicker(void* data) {
      g_pHyprRenderer->ensureCursorRenderingMode();
@@ -35,7 +35,7 @@ index 249f084..d3b31ae 100644
      return 0;
  }
  
-@@ -161,6 +163,9 @@ IHyprRenderer::IHyprRenderer() {
+@@ -165,6 +167,9 @@ IHyprRenderer::IHyprRenderer() {
          m_cursorHiddenConditions.hiddenOnTouch    = g_pInputManager->m_lastInputTouch;
          m_cursorHiddenConditions.hiddenOnTablet   = g_pInputManager->m_lastInputTablet;
          ensureCursorRenderingMode();
@@ -45,7 +45,7 @@ index 249f084..d3b31ae 100644
      });
  
      static auto P3 = Event::bus()->m_events.monitor.focused.listen([&](PHLMONITOR mon) {
-@@ -2911,6 +2916,11 @@ void IHyprRenderer::setCursorFromName(const std::string& name, bool force) {
+@@ -3187,6 +3192,11 @@ void IHyprRenderer::setCursorFromName(const std::string& name, bool force) {
      Pointer::Cursor::mgr()->setCursorFromName(name);
  }
  
@@ -58,16 +58,16 @@ index 249f084..d3b31ae 100644
      static auto PINVISIBLE     = CConfigValue<Config::INTEGER>("cursor:invisible");
      static auto PCURSORTIMEOUT = CConfigValue<Config::FLOAT>("cursor:inactive_timeout");
 diff --git a/src/render/Renderer.hpp b/src/render/Renderer.hpp
-index b4f5ab8..fcb1ff1 100644
+index a5307fa..cf62a74 100644
 --- a/src/render/Renderer.hpp
 +++ b/src/render/Renderer.hpp
-@@ -82,6 +82,7 @@ namespace Render {
-         bool                                shouldRenderWindow(PHLWINDOW);
-         bool                                shouldRenderMonitor(PHLMONITOR);
-         void                                ensureCursorRenderingMode();
+@@ -104,6 +104,7 @@ namespace Render {
+         bool                            shouldRenderWindow(PHLWINDOW);
+         bool                            shouldRenderMonitor(PHLMONITOR);
+         void                            ensureCursorRenderingMode();
 +        int                                 cursorTickerDelayMs();
-         bool                                shouldRenderCursor();
-         void                                setCursorHidden(bool hide);
+         bool                            shouldRenderCursor();
+         void                            setCursorHidden(bool hide);
  
 diff --git a/tests/helpers/WolosPerf.cpp b/tests/helpers/WolosPerf.cpp
 index a316596..20b9b89 100644

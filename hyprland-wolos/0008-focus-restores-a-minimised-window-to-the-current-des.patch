@@ -1,7 +1,7 @@
-From b21964f5bc0d1562393295b70a368756204b7832 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: kleeedolinux <71413974+kleeedolinux@users.noreply.github.com>
 Date: Wed, 28 Oct 2026 13:07:14 -0300
-Subject: [PATCH 8/9] focus: restores a minimised window to the current desktop
+Subject: [PATCH] focus: restores a minimised window to the current desktop
 
 Dock click or app activation on a special:hidden window opened it as an overlay; macOS brings it back.
 ---
@@ -13,29 +13,29 @@ Dock click or app activation on a special:hidden window opened it as an overlay;
  create mode 100644 tests/helpers/WolosWindow.cpp
 
 diff --git a/src/desktop/state/FocusState.cpp b/src/desktop/state/FocusState.cpp
-index 172da08..f57efba 100644
+index b3a2070..a2d4ec0 100644
 --- a/src/desktop/state/FocusState.cpp
 +++ b/src/desktop/state/FocusState.cpp
 @@ -1,4 +1,6 @@
  #include "FocusState.hpp"
 +#include "GlobalWindowController.hpp"
 +#include "../../helpers/WolosWindow.hpp"
- #include "../view/Window.hpp"
- #include "../../Compositor.hpp"
- #include "../../protocols/XDGShell.hpp"
-@@ -158,6 +160,12 @@ void CFocusState::rawWindowFocus(PHLWINDOW pWindow, eFocusReason reason, SP<CWLS
-     if (pWindow->m_pinned)
+ #include "../view/window/WindowFullscreenPolicy.hpp"
+ #include "../view/window/WindowGroupMembership.hpp"
+ #include "../view/window/Window.hpp"
+@@ -165,6 +167,12 @@ void CFocusState::rawWindowFocus(PHLWINDOW pWindow, eFocusReason reason, SP<CWLS
+     if (pWindow->m_state & Desktop::View::WINDOW_STATE_PINNED)
          pWindow->m_workspace = m_focusMonitor->m_activeWorkspace;
  
 +    // WolOS: focusing a minimised window (Dock click, focuswindow, app activation) restores it to the
 +    // current desktop, like macOS, instead of opening special:hidden as an overlay.
 +    if (pWindow->m_workspace && m_focusMonitor && m_focusMonitor->m_activeWorkspace &&
-+        WolosWindow::restoresOnFocus(pWindow->m_workspace->m_isSpecialWorkspace, pWindow->m_workspace->m_name))
++        WolosWindow::restoresOnFocus(pWindow->m_workspace->type() == Workspace::eWorkspaceType::SPECIAL, pWindow->m_workspace->addressableName()))
 +        Desktop::globalWindowController()->moveWindowToWorkspace(pWindow, m_focusMonitor->m_activeWorkspace);
 +
      const auto PMONITOR = pWindow->m_monitor.lock();
  
-     if (!pWindow->m_workspace || !pWindow->m_workspace->isVisible()) {
+     if (!pWindow->m_workspace || !pWindow->m_workspace->visible()) {
 diff --git a/src/helpers/WolosWindow.hpp b/src/helpers/WolosWindow.hpp
 new file mode 100644
 index 0000000..015088e
@@ -75,6 +75,3 @@ index 0000000..7146be9
 +    EXPECT_FALSE(restoresOnFocus(false, "special:hidden"));    // a regular workspace with that name
 +    EXPECT_FALSE(restoresOnFocus(false, "1"));
 +}
--- 
-2.54.0
-
