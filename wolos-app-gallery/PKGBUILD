@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-app-gallery: Gallery (org.wolos.gallery), the WolOS picture library and viewer, a Crystal app
+# on the wolkit shard and libwolkit, built from wolos-crystal/apps/gallery of
+# github.com/wonderlandos/wolos (wolos docs/modules/gallery.md). The shards it uses are in the same
+# tree (relative requires), so the build fetches nothing; libwolkit and libwol are linked from the
+# system.
+pkgname=wolos-app-gallery
+pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS picture library and viewer: smart sections by date and place, zoom, slideshow'
+arch=(x86_64)
+url='https://github.com/wonderlandos/wolos'
+license=(BSD-2-Clause)
+# libwolkit draws the window, libwol carries the system verbs (share sheet, preferences); openssl
+# gives the SHA-256 that names cached thumbnails.
+depends=(gc pcre2 openssl zlib gcc-libs glibc libwolkit libwol)
+optdepends=('wolos-system: the WolOS icon theme the launcher entry names')
+makedepends=(crystal git)
+options=(!debug !lto)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). No submodule is needed: the
+# app and both shards are plain Crystal source in the main tree.
+_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+build() {
+  cd "$srcdir/wolos/wolos-crystal/apps/gallery"
+  # The system's libwolkit.so and libwol.so (makechrootpkg installs the local [wolos] packages).
+  make bin/gallery WOLKIT_BUILD=/usr/lib RELEASE='--release --no-debug'
+}
+
+check() {
+  cd "$srcdir/wolos/wolos-crystal/apps/gallery"
+  # The pure specs (camera block, sections, zoom, cache, Trash), then the app in the headless engine
+  # against its golden screenshots with the pinned fonts of the source tree, and the look against
+  # its sheet (wolkit-stylec comes with libwolkit).
+  make spec WOLKIT_BUILD=/usr/lib WOLKIT_STYLEC=/usr/bin/wolkit-stylec
+}
+
+package() {
+  local _repo=$srcdir/wolos _app=$srcdir/wolos/wolos-crystal/apps/gallery
+  install -Dm755 "$_app/bin/gallery" "$pkgdir/usr/bin/wol-gallery"
+  install -Dm644 "$_app/org.wolos.gallery.desktop" "$pkgdir/usr/share/applications/org.wolos.gallery.desktop"
+  install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
