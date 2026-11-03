@@ -149,13 +149,14 @@ fn wolos_packages() -> Vec<String> {
 }
 
 /// Crystal is the userland language and Cryswol its framework (ADR 0036): the developer module
-/// brings the compiler, libwol.so.1 and the shard under /usr/lib/wolos/crystal/cryswol, so a
-/// `require "cryswol"` program builds and runs on an installed system (the image does not ship
-/// them). libwol and cryswol come from [wolos]; no other module depends on a [wolos] package.
+/// brings the compiler (with pkgconf), libwol.so.1 and the shard under
+/// /usr/lib/wolos/crystal/cryswol, so a `require "cryswol"` program builds and runs on an installed
+/// system (the image does not ship them). libwol and cryswol come from [wolos]; no other module depends on a [wolos] package.
 #[test]
 fn dev_module_brings_the_crystal_runtime() {
     let deps = pkgvar("wolos-module-dev", "depends");
-    for p in ["crystal", "libwol", "cryswol"] {
+    // pkgconf: `crystal build` asks pkg-config for the libraries a shard links.
+    for p in ["crystal", "pkgconf", "libwol", "cryswol"] {
         assert!(deps.iter().any(|d| d == p), "wolos-module-dev lacks {p}");
     }
     let ours = wolos_packages();
