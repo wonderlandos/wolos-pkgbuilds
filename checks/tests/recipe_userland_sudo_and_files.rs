@@ -69,7 +69,10 @@ fn files_offers_the_full_check_and_the_action_can_only_start_wol_analyze() {
     let c = read("desktop/nautilus/wolos-analyze.c");
     // The label names what it does, not whose engine (Wonderland Doctrine).
     assert!(c.contains("#define MENU_LABEL \"Check for Malware\""));
-    assert!(!c.to_lowercase().contains("clamav"), "no engine name in the action");
+    assert!(
+        !c.to_lowercase().contains("clamav"),
+        "no engine name in the action"
+    );
     assert!(c.contains("\"wol-analyze\""));
     let rust = read("tools/build-rust.sh");
     assert!(rust.contains(" wol-analyze"));
