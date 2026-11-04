@@ -8,7 +8,7 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-ai-local
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS Local AI module: Ollama, GPU backend from wol hw compute'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

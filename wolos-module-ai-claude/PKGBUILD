@@ -12,7 +12,7 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-ai-claude
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS AI module: Claude Code acting through wol mcp, with git, ripgrep and zellij'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

@@ -6,7 +6,7 @@
 # cannot change what we ship. Not on the image: OBS itself is an online install.
 pkgname=obs-pipewire-audio-capture
 pkgver=1.2.2
-pkgrel=1
+pkgrel=2
 pkgdesc='PipeWire audio capture sources for OBS Studio (app, desktop, input)'
 arch=(x86_64)
 url='https://github.com/dimtpap/obs-pipewire-audio-capture'

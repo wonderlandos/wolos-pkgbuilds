@@ -8,7 +8,7 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-creative
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS Creative module: Blender, GIMP, Krita, Inkscape, OBS, darktable, Kdenlive, Ardour, Audacity'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

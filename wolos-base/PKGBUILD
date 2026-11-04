@@ -10,8 +10,10 @@
 # Built with makepkg --nodeps (./build.conf): its depends are the installed system's, nothing it builds
 # with, and wolos-system's /etc/sudoers clashes with the chroot's sudo.
 pkgname=wolos-base
-pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
+# Arch Linux Archive date this release is pinned to (../snapshot; tools/bump-snapshot.sh moves both).
+_snapshot=2026-11-02
 pkgdesc='WolOS base system: kernel, headers and userland of one release'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -25,7 +27,7 @@ backup=()
 install=wolos-base.install
 # os-release comes from the WolOS source (files/usr/share/wolos/os-release) at one commit, as one
 # file with its checksum (bump-wolos.sh moves both): no git, which --nodeps would not install.
-_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+_wolos_commit=baeb1c671580bd818cb940f316ba9ffa31076f76
 _os_release_sha256=1345cbb2d23dbb57949c6751baca359cf256b1e207941a194ba9fb6855cd46c9
 source=("os-release-$_wolos_commit::https://raw.githubusercontent.com/wonderlandos/wolos/$_wolos_commit/files/usr/share/wolos/os-release"
   wolos-os-release.hook base.manifest)
@@ -55,6 +57,11 @@ package() {
   sed "s/@VERSION@/$pkgver/g" "$srcdir/os-release-$_wolos_commit" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/os-release"
   install -Dm644 "$srcdir/wolos-os-release.hook" "$pkgdir/usr/share/libalpm/hooks/wolos-os-release.hook"
   echo "$pkgver" | install -Dm644 /dev/stdin "$pkgdir/usr/share/wolos/base.version"
+  # The running release (wol_core::update::check::Running, RELEASE_FILE): version and archive date,
+  # no image hash (an image cannot carry its own). A system update replaces it with the package.
+  # The channel stays /etc/wolos/channel: the person changes it, a release does not.
+  printf '{"version":"%s","snapshot":"%s"}\n' "$pkgver" "${_snapshot//-//}" |
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/wolos-release.json"
   # Manifest last: it hashes the base packages and this package's own files.
   {
     cat "$srcdir/base.manifest"

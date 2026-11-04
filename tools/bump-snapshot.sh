@@ -19,6 +19,7 @@ for f in "${confs[@]}"; do
 done
 old=$(tr -d '[:space:]' < snapshot)
 for f in snapshot "$iso/profile/snapshot"; do echo "$d" > "$f"; done
+sed -i -E "s/^_snapshot=[0-9]{4}-[0-9]{2}-[0-9]{2}$/_snapshot=$d/" wolos-base/PKGBUILD
 for f in "${confs[@]}"; do sed -i -E "s#/repos/[0-9]{4}/[0-9]{2}/[0-9]{2}/#/repos/${d//-//}/#g" "$f"; done
 m=wolos-mirrorlist
 sed -i -E "s/[0-9]{4}-[0-9]{2}-[0-9]{2}/$d/g" "$m/wolos-mirrorlist"

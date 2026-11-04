@@ -5,15 +5,15 @@
 # REPO_DOMAIN in both files is the CloudFront domain: commented out until terraform apply, then
 # set once (pkgrel bump).
 pkgname=wolos-mirrorlist
-pkgver=2026.10.31
-pkgrel=3
+pkgver=2026.11.02
+pkgrel=1
 pkgdesc='WolOS package mirror list'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 backup=(etc/pacman.d/wolos-mirrorlist etc/pacman.d/wolos-cachy-mirrorlist)
 source=(wolos-mirrorlist wolos-cachy-mirrorlist)
-sha256sums=('28b0dcdb1268d339ddaa4e4b4f6f27aede868f0ad2fb4dccfa76e19355dd0046'
+sha256sums=('aa6891a0d8c55f326457ab8b7c85db72b3c5c15c8a21c1a0a4beb132c28d57aa'
             'ceadfb285fbec7b34c1d0bd9627aa9c7d6a06141876aa11a4e2219a5d2e066fc')
 
 package() {
