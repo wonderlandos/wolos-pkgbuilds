@@ -800,12 +800,12 @@ fn bash_setup_runs_with_the_theme_colours_and_no_starship() {
     // accent changes, to tell the user file from the shipped one.
     let shipped = read("desktop/overlay/usr/share/wolos/toolkits/bash/colors.sh");
     assert!(
-        shipped.contains("WOLOS_ANSI_ACCENT='38;2;112;83;230'"),
+        shipped.contains("WOLOS_ANSI_ACCENT='38;2;110;78;233'"),
         "{shipped}"
     );
     fs::write(
         &colors,
-        shipped.replace("38;2;112;83;230", "38;2;124;92;255"),
+        shipped.replace("38;2;110;78;233", "38;2;124;92;255"),
     )
     .unwrap();
     let probe = format!(

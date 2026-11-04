@@ -176,7 +176,7 @@ fn update_slot_is_wol_update_apply() {
     assert!(st.success());
     assert_eq!(
         log(&d),
-        "findmnt -no OPTIONS /\nwol update apply @wolos-b 2026/11/20 --yes\n"
+        "findmnt -no OPTIONS /\nwol update apply wolos-b 2026/11/20 --yes\n"
     );
     let w = read("wolos-system/PKGBUILD");
     // wolos-system ships the whole files/ tree of the pinned source, wolos-update-slot with it.

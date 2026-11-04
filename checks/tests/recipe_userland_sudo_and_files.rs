@@ -25,7 +25,8 @@ fn administrators_can_sudo() {
         .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
         .map(String::from)
         .collect();
-    assert_eq!(rules, ["%wheel ALL=(ALL:ALL) ALL"]);
+    // A refused sudo says why, never with an insult (wolos QA-LIVE3-24).
+    assert_eq!(rules, ["%wheel ALL=(ALL:ALL) ALL", "Defaults !insults"]);
     assert!(
         read("wolos-system/PKGBUILD").contains(r#"chmod 440 "$pkgdir/etc/sudoers.d/wolos""#),
         "sudoers drop-in must be 0440"
@@ -49,7 +50,20 @@ fn sudo_works_on_every_system() {
     assert!(sudoers.lines().any(|l| l == "@includedir /etc/sudoers.d"));
     for service in ["sudo", "sudo-i"] {
         let pam = read(&format!("desktop/overlay/etc/pam.d/{service}"));
-        for kind in ["auth", "account", "session"] {
+        // auth is WolOS's own stack (wolos QA-PRIV-13: pam_faillock around pam_unix, the lock
+        // screen's limits); account and session are Arch's.
+        for module in [
+            "pam_faillock.so preauth",
+            "pam_unix.so",
+            "pam_faillock.so authfail",
+        ] {
+            assert!(
+                pam.lines()
+                    .any(|l| l.starts_with("auth") && l.contains(module)),
+                "{service}: auth {module}"
+            );
+        }
+        for kind in ["account", "session"] {
             assert!(
                 pam.lines()
                     .any(|l| l.starts_with(kind) && l.ends_with("system-auth")),

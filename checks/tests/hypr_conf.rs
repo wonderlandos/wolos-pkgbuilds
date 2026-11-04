@@ -44,8 +44,12 @@ fn session_starts_hyprland_without_nag_banners() {
         .rev()
         .find(|l| l.starts_with("exec "))
         .unwrap();
-    // On the user bus inside a logind session, else a private bus: always through start-hyprland.
-    assert_eq!(launch, "exec ${bus:+$bus --} start-hyprland");
+    // On the user bus inside a logind session, else a private bus: always through start-hyprland;
+    // the WolOS defaults' file as Hyprland's --config when the account's cannot be used (QA-LIVE-33).
+    assert_eq!(
+        launch,
+        "exec ${bus:+$bus --} start-hyprland ${defaults:+-- $defaults}"
+    );
     // hyprland-guiutils is not in the image: its "missing" banner must be off.
     assert_eq!(value("disable_hyprland_guiutils_check"), "true");
     let dir = format!("{}/hyprland-wolos", siblings::root_str());
