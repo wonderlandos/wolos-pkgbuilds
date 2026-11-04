@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgrel=3
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -32,8 +32,16 @@ _brand_commit=6c6d2c0511b8d1427d81929d537113e71e7be737
 _shell_commit=b72d6806e8939ceb218ec0190707a381515a22a4
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
   "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
-  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
-sha256sums=(SKIP SKIP SKIP)
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit"
+  update-check)
+# 0.12.0-3 (QA-UPG-1): the update-check of 0.12.0-2 calls checkupdates, which needs fakeroot (not in
+# the image): it exits 0 without ever finding an update. The file here is wolos wave3/int 88702475
+# files/usr/lib/wolos/update-check, verbatim (pacman --dbpath on a temporary copy; exit 75 offline,
+# stamped only on success); package() puts it over the one in the pinned source. Nothing else
+# differs from 0.12.0-2. Drop it, source line and sum with the next _wolos_commit bump (the pinned
+# source then carries this check itself).
+sha256sums=(SKIP SKIP SKIP
+  1009fb27b2896e65e8b275fabb7540536fbc754b00c4f3335514816348a0d644)
 
 prepare() {
   cd "$srcdir/wolos"
@@ -76,6 +84,7 @@ package() {
   chmod 440 "$pkgdir/etc/sudoers"
   chmod 440 "$pkgdir/etc/sudoers.d/wolos"
   chmod 755 "$pkgdir"/usr/lib/wolos/* "$pkgdir"/usr/bin/*
+  install -Dm755 "$srcdir/update-check" "$pkgdir/usr/lib/wolos/update-check"
   # polkit reads rules only from a directory polkitd can read and others cannot: the same owner and
   # mode Arch's polkit package gives it (root:102 = polkitd, 0750), so pacman sees no conflict.
   if [ -d "$pkgdir/usr/share/polkit-1/rules.d" ]; then
