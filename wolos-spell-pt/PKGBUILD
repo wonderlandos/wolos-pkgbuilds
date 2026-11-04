@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-spell-pt: the Portuguese (Brazil and Portugal) word lists for the hunspell backend of enchant,
+# which is what Text Editor, Papers and Geary check spelling with. The distribution's repository has
+# no hunspell-pt-br or hunspell-pt-pt, and the image has to cover every language of the language
+# picker that has a word list (ADR 0059 S14, wolos docs/modules/experience.md). The lists are the
+# LibreOffice dictionaries project's, pinned to one commit by its raw file URLs and their sha256.
+pkgname=wolos-spell-pt
+pkgver=20261027  # the date of the dictionaries commit below
+pkgrel=1
+pkgdesc='Portuguese (Brazil, Portugal) spell-check word lists for hunspell'
+arch=(any)
+url='https://github.com/LibreOffice/dictionaries'
+# pt_BR: LGPL-3.0 or MPL-2.0 (VERO project); pt_PT: GPL-2.0, LGPL-2.1 or MPL-1.1, in this order
+# (Universidade do Minho). Each README states it and is installed with the lists.
+license=(LGPL-3.0-only MPL-2.0 GPL-2.0-only LGPL-2.1-only MPL-1.1)
+depends=(hunspell)
+checkdepends=(hunspell)
+provides=(hunspell-dictionary)
+_dictionaries_commit=4f1df64b2e8e14751aa7c2205d170ca016071315
+_raw="https://raw.githubusercontent.com/LibreOffice/dictionaries/$_dictionaries_commit"
+source=("pt_BR.dic::$_raw/pt_BR/pt_BR.dic"
+        "pt_BR.aff::$_raw/pt_BR/pt_BR.aff"
+        "README_pt_BR.txt::$_raw/pt_BR/README_pt_BR.txt"
+        "pt_PT.dic::$_raw/pt_PT/pt_PT.dic"
+        "pt_PT.aff::$_raw/pt_PT/pt_PT.aff"
+        "README_pt_PT.txt::$_raw/pt_PT/README_pt_PT.txt")
+sha256sums=('a38bfb26b68ece2834e79fe83e48d5792652970ace12db89d1b9674bf9933183'
+            '21d8ad2a769a60e17e2b5ea4ef11d4d593a58b9e2a82d642ef82d6a4c5523865'
+            '9974ce691fdc1fe731717d7a2dc668244405fdc2bf9bf3367eb9b29e85177c88'
+            'e29ba2d7aa8a2ad43e9cb46ac6473064b661545c87002aea90e18899d98d3cc9'
+            '975a209fcc892cb382fa5f34a28c391a39668661ce373ae071287809c5fcae24'
+            '36de7d88a406a4947bf646a64145f00827566808988632e3df969aa95776060c')
+
+check() {
+  cd "$srcdir"
+  # A real word passes and a non-word is listed, in both lists.
+  local l
+  for l in pt_BR pt_PT; do
+    [[ -z $(echo casa | hunspell -d "$l" -l) ]]
+    [[ -n $(echo qwzxkv | hunspell -d "$l" -l) ]]
+  done
+}
+
+package() {
+  cd "$srcdir"
+  local l
+  for l in pt_BR pt_PT; do
+    install -Dm644 "$l.dic" "$pkgdir/usr/share/hunspell/$l.dic"
+    install -Dm644 "$l.aff" "$pkgdir/usr/share/hunspell/$l.aff"
+    install -Dm644 "README_$l.txt" "$pkgdir/usr/share/licenses/$pkgname/README_$l.txt"
+  done
+}
