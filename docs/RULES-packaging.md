@@ -69,6 +69,9 @@ relaxed by adding an entry.
 | RP-052 | no checks test reads `<dir>/PKGBUILD` for a directory that does not exist | checks |
 | RP-053 | every checks test starts with the SPDX line and has a `//!` description | checks |
 | RP-054 | every checks test file contains a #[test] | checks |
+| RP-055 | every file wolos-system ships under `etc/` (the wolos tree's `desktop/overlay/etc`) is in backup=, or a baseline row says why an upgrade may put it back | origins (0.13) |
+| RP-056 | no `|| return 0` or `|| exit 0` in a recipe: a step whose input is absent fails loudly, it does not ship a package without it | origins (0.13) |
+| RP-057 | every `_wolos_commit`, `_brand_commit` and `_shell_commit` is a commit a remote branch or tag of the wolos checkout (`$WOLOS_SRC`, else `../wolos`) still contains: the builder fetches a pin by sha and a host serves only what a ref reaches (not checked without a checkout) | origins (0.13) |
 
 ## Known violations (baseline)
 
@@ -79,6 +82,14 @@ relaxed by adding an entry.
   the sibling repos or the image (or a recipe directory not yet here), not a directory of this repo.
 - RP-051: recipe_firewall_files.rs and recipe_network_vpn.rs (NET-3) test files that read wolos-system through the
   overlaid tree and name no package directory of their own.
+
+- RP-055: the `etc/` files of the overlay that no person or Settings page writes (NetworkManager dispatcher, Chromium
+  and Flatpak policy, fonts, the PAM stacks, the polkit-like job files, the GTK, Qt and portal defaults): an upgrade
+  putting the shipped file back is the intent. A new file under `desktop/overlay/etc` that a person or a Settings
+  page writes (the firewall rule files and the sudoers drop-in were the two that 0f05dc2 and 870c239 fixed) goes into
+  backup=; one that does not needs a row here with the reason.
+- RP-056: wolos-system's `_brand_walls_package` skips an absent staging directory (`[ -d "$e" ] || return 0`);
+  `_brand_walls_build` already fails when the generator is missing (3c1044e), so the directory exists in a good build.
 
 ## Not automated
 

@@ -5,6 +5,8 @@
 //! violations; a new violation fails, and so does a baseline entry that no longer violates (delete
 //! it). The doc and the tests list the same ids (rp_catalogue_matches_docs).
 #![allow(dead_code)]
+#[path = "support/siblings.rs"]
+mod siblings;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -25,6 +27,26 @@ const BASELINE: &[(&str, &str)] = &[
     // NET-3: the firewall rule files and the OpenVPN plugin are files of the wolos-system package, checked from its recipe.
     ("RP-051", "recipe_firewall_files.rs"),
     ("RP-051", "recipe_network_vpn.rs"),
+    // RP-055: files of /etc that wolos-system ships and a person or Settings never writes; an
+    // upgrade putting the shipped file back is the intent (policy), so they stay out of backup=.
+    ("RP-055", "etc/NetworkManager/dispatcher.d/50-wolos-online"),
+    ("RP-055", "etc/chromium/policies/managed/wolos.json"),
+    ("RP-055", "etc/flatpak/remotes.d/flathub.flatpakrepo"),
+    ("RP-055", "etc/fonts/conf.d/50-wolos-fonts.conf"),
+    ("RP-055", "etc/fonts/conf.d/60-wolos-inter.conf"),
+    ("RP-055", "etc/pam.d/sudo"),
+    ("RP-055", "etc/pam.d/sudo-i"),
+    ("RP-055", "etc/pam.d/wol-admin"),
+    ("RP-055", "etc/pam.d/wol-lock"),
+    ("RP-055", "etc/wolos/jobs/org.wol.admin.json"),
+    ("RP-055", "etc/wolos/jobs/org.wol.login.json"),
+    ("RP-055", "etc/xdg/gtk-3.0/settings.ini"),
+    ("RP-055", "etc/xdg/gtk-4.0/settings.ini"),
+    ("RP-055", "etc/xdg/qt6ct/qt6ct.conf"),
+    ("RP-055", "etc/xdg/xdg-desktop-portal/hyprland-portals.conf"),
+    // RP-056: the staging directory of the themed wallpapers; build() fails loudly when the
+    // generator is missing (3c1044e), the package step still skips an absent staging directory.
+    ("RP-056", "wolos-system: [ -d \"$e\" ] || return 0"),
 ];
 
 fn root() -> PathBuf {
@@ -1101,6 +1123,177 @@ fn rp_054_every_test_file_has_a_test() {
             .filter(|f| !read(&format!("checks/tests/{f}")).contains("#[test]"))
             .collect(),
     );
+}
+
+// ---- the origins of the 0.13 bugs (docs/STANDARDS.md "Origins of the 0.13 bugs") -------------
+/// Files under `desktop/overlay/etc` of the wolos tree (the sibling): `etc/...` paths, sorted.
+fn overlay_etc() -> Vec<String> {
+    fn go(dir: &Path, base: &Path, out: &mut Vec<String>) {
+        let Ok(rd) = fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                go(&p, base, out);
+            } else if let Ok(r) = p.strip_prefix(base) {
+                out.push(format!("etc/{}", r.to_string_lossy()));
+            }
+        }
+    }
+    let base = siblings::root().join("desktop/overlay/etc");
+    let mut v = vec![];
+    go(&base, &base, &mut v);
+    v.sort();
+    v
+}
+
+/// RP-055 reads the shipped file list of the wolos tree; the same function with a list and a
+/// `backup=` array, so the self-test can feed it a recipe that forgot a file.
+fn unkept(backup: &[String], shipped: &[String]) -> Vec<String> {
+    shipped
+        .iter()
+        .filter(|f| !backup.contains(f))
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn rp_055_every_file_of_etc_is_kept_across_upgrades_or_named_policy() {
+    let recipe = read("wolos-system/PKGBUILD");
+    let backup = array(&recipe, "backup").expect("wolos-system has backup=");
+    let shipped = overlay_etc();
+    assert!(
+        shipped.len() >= 20,
+        "only {} files under desktop/overlay/etc: is the wolos sibling there?",
+        shipped.len()
+    );
+    verdict("RP-055", unkept(&backup, &shipped));
+}
+
+#[test]
+fn rp_055_reader_reads_what_it_says() {
+    let backup = vec!["etc/a".to_string()];
+    let shipped = vec!["etc/a".to_string(), "etc/b".to_string()];
+    assert_eq!(unkept(&backup, &shipped), vec!["etc/b".to_string()]);
+}
+
+/// Lines of a recipe's functions that end a step by returning success when its input is absent.
+fn silent_skips(text: &str) -> Vec<String> {
+    text.lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter(|l| l.contains("|| return 0") || l.contains("|| exit 0"))
+        .map(|l| l.trim().to_string())
+        .collect()
+}
+
+#[test]
+fn rp_056_a_build_step_never_skips_silently() {
+    each("RP-056", |_, t| silent_skips(t));
+}
+
+#[test]
+fn rp_056_reader_reads_what_it_says() {
+    assert_eq!(silent_skips("  [ -f \"$g\" ] || return 0\n").len(), 1);
+    assert_eq!(silent_skips("  # [ -f \"$g\" ] || return 0\n").len(), 0);
+    assert_eq!(
+        silent_skips("  [ -f \"$g\" ] || { echo missing >&2; return 1; }\n").len(),
+        0
+    );
+}
+
+/// The wolos git checkout: `$WOLOS_SRC`, else `../wolos` next to this repo (as siblings.rs does).
+fn wolos_checkout() -> PathBuf {
+    std::env::var_os("WOLOS_SRC")
+        .map_or_else(|| root().parent().unwrap().join("wolos"), PathBuf::from)
+}
+
+/// The commits a recipe pins: (variable, sha, the git directory under the wolos checkout that
+/// must have it).
+fn pins(text: &str) -> Vec<(&'static str, String, &'static str)> {
+    [
+        ("_wolos_commit", "."),
+        ("_brand_commit", "design"),
+        ("_shell_commit", "crates/shell"),
+    ]
+    .iter()
+    .filter_map(|(v, d)| scalar(text, v).map(|s| (*v, s, *d)))
+    .collect()
+}
+
+/// Whether `sha` is a commit some remote branch or tag of the git directory `dir` contains: the
+/// builder fetches a pin by sha, and a host serves only what a ref still reaches (a rewritten
+/// history left the old pins unreachable and a publish run failed at its first step, f7605d99).
+/// `None` when `dir` is no git directory here (a checkout without the sibling).
+fn reachable(dir: &Path, sha: &str) -> Option<bool> {
+    use std::process::Command;
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .ok()
+    };
+    let top = git(&["rev-parse", "--is-inside-work-tree"])?;
+    if !top.status.success() {
+        return None;
+    }
+    let has = git(&["cat-file", "-e", &format!("{sha}^{{commit}}")])?;
+    if !has.status.success() {
+        return Some(false);
+    }
+    let b = git(&["branch", "-r", "--contains", sha])?;
+    let t = git(&["tag", "--contains", sha])?;
+    Some(!b.stdout.is_empty() || !t.stdout.is_empty())
+}
+
+#[test]
+fn rp_057_every_pinned_commit_is_reachable_from_its_repository() {
+    let wolos = wolos_checkout();
+    let mut checked = 0;
+    let mut found = vec![];
+    for (d, t) in recipes() {
+        for (var, sha, sub) in pins(&t) {
+            let dir = wolos.join(sub);
+            match reachable(&dir, &sha) {
+                Some(true) => checked += 1,
+                Some(false) => found.push(format!(
+                    "{d}: {var}={sha} is not reachable from a ref of {}",
+                    dir.display()
+                )),
+                None => {}
+            }
+        }
+    }
+    if checked == 0 && found.is_empty() {
+        eprintln!(
+            "RP-057: no wolos git checkout at {} ({}): not checked",
+            wolos.display(),
+            "set WOLOS_SRC"
+        );
+        return;
+    }
+    verdict("RP-057", found);
+}
+
+#[test]
+fn rp_057_reader_reads_what_it_says() {
+    let t = "_wolos_commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n_shell_commit=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n";
+    let p = pins(t);
+    assert_eq!(p.len(), 2);
+    assert_eq!(p[1].2, "crates/shell");
+    // A directory that is no git repository is not checked; one that lacks the commit fails.
+    assert_eq!(
+        reachable(Path::new("/nonexistent-dir-for-rp057"), &p[0].1),
+        None
+    );
+    let here = root();
+    if here.join(".git").exists() {
+        assert_eq!(
+            reachable(&here, &p[0].1),
+            Some(false),
+            "an unknown sha is unreachable"
+        );
+    }
 }
 
 /// Rule ids of docs/RULES-packaging.md (`| RP-nnn |` rows) and of the `fn rp_nnn_` tests here.
