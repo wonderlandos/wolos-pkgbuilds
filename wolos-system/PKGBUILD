@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=4
+pkgrel=5
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -13,8 +13,10 @@ license=(GPL-2.0-or-later CC-BY-NC-ND-4.0)
 # nftables: etc/wolos/nftables.conf runs nft; libnautilus-extension: the Files "Analyze with ClamAV"
 # extension (usr/lib/nautilus/extensions-4/libwolos-analyze.so) links it. arch-audit: the CVE list
 # usr/lib/wolos/update-check writes (Settings > Updates, Security); without it that list is absent.
+# networkmanager-openvpn + openvpn: Settings > Network > Add VPN and `wol vpn import` of .ovpn files
+# (NET-3; NetworkManager's OpenVPN plugin, about 5 MiB installed).
 depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plymouth nftables
-  libnautilus-extension arch-audit)
+  libnautilus-extension arch-audit networkmanager-openvpn openvpn)
 # Our cursor theme is the default one (usr/share/icons/default).
 provides=(default-cursors)
 conflicts=(default-cursors)
