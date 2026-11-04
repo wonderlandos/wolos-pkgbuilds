@@ -23,6 +23,7 @@ wolkit         wolkit               libwolkit,libwol,cryswol                wolk
 wolos-hue      wolos-hue            -                                       wolos-hue/
 scx-wolos      scx-wolos            linux-wolos                             scx-wolos/ linux-wolos/VERSION
 rsh            rsh                  -                                       rsh/
+wolos-app-gallery wolos-app-gallery libwolkit,libwol                      wolos-app-gallery/
 wolos-shim     wolos-shim           -                                       wolos-shim/
 wolos-keyring  wolos-keyring        -                                       wolos-keyring/
 obs-pipewire-audio-capture obs-pipewire-audio-capture -                 obs-pipewire-audio-capture/
