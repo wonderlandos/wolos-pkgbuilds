@@ -3,8 +3,8 @@
 # wolos docs/modules/hue.md). Crystal, built from github.com/wonderlandos/wolos (hue/), no shards;
 # the parts translated from MIT code carry their notice, installed as THIRD-PARTY.md.
 pkgname=wolos-hue
-pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
 pkgdesc='WolOS theme from a picture: palette engine, sliders, Base16 and colors.toml import'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -14,7 +14,7 @@ optdepends=('webp-pixbuf-loader: WebP pictures' 'libavif: AVIF pictures' 'wolos-
 makedepends=(crystal git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
-_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+_wolos_commit=baeb1c671580bd818cb940f316ba9ffa31076f76
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 
