@@ -31,6 +31,10 @@ on:
         description: sign (sign + publish) or cdn (push an already uploaded signed repo to the CDN)
         type: string
         default: sign
+      channel:
+        description: testing ([wolos-testing], default) or stable (a hotfix package into [wolos] of the built commit's snapshot; wolos-build's stable gate applies)
+        type: string
+        default: testing
     secrets:
       WOLOS_GPG_KEY:
         required: true
@@ -55,6 +59,7 @@ jobs:
     env:
       RUN: ${{ inputs.run }}
       WOLOS_RUN: ${{ inputs.run }}
+      WOLOS_CHANNEL: ${{ inputs.channel }}
       BUCKET: ${{ vars.BUCKET }}
       GH_REPO: ${{ vars.WOLOS_RELEASES_REPO || 'wonderlandos/wolos-packages' }}
       # The releases repo is public: the caller's token reads it; only writes need the releases token.
@@ -68,6 +73,7 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           case $RUN in ''|*/*|*' '*) echo "::error::run '$RUN' is not an ECS run id"; exit 1 ;; esac
+          case $WOLOS_CHANNEL in testing|stable) ;; *) echo "::error::channel is testing or stable, not '$WOLOS_CHANNEL'"; exit 1 ;; esac
           case $MODE in sign|cdn) ;; *) echo "::error::mode is sign or cdn, not '$MODE'"; exit 1 ;; esac
           [ -n "$BUCKET" ] || { echo "::error::vars.BUCKET is not set in the calling repo"; exit 1; }
       # I7-4: the signer runs from the commit of this workflow that the caller pinned in `uses:`
@@ -129,7 +135,7 @@ jobs:
           tool/builder bash -euo pipefail -c '
               echo "$GPG_KEY" | gpg --batch --import
               export WOLOS_SIGN_KEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/ {print \$10; exit}")
-              WOLOS_PKGBUILDS=$PWD/wolos-pkgbuilds WOLOS_WORK=$PWD/out/work wolos-build publish --run "$WOLOS_RUN" testing out/built
+              WOLOS_PKGBUILDS=$PWD/wolos-pkgbuilds WOLOS_WORK=$PWD/out/work wolos-build publish --run "$WOLOS_RUN" "$WOLOS_CHANNEL" out/built
             '
           [ ! -f out/summary.md ] || cat out/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
