@@ -21,7 +21,7 @@ conflicts=(default-cursors)
 replaces=(default-cursors)
 makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus pipewire)
 options=(!debug !lto)
-backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf
+backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf etc/wolos/nftables.d/ssh.conf
   etc/zsh/zshenv etc/zellij/config.kdl etc/mise/config.toml etc/fish/conf.d/wolos.fish
   etc/profile.d/wolos-console.sh)
 install=wolos-system.install
