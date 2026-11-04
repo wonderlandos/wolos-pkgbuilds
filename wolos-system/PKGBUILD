@@ -21,9 +21,9 @@ conflicts=(default-cursors)
 replaces=(default-cursors)
 makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus pipewire)
 options=(!debug !lto)
-backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf etc/wolos/nftables.d/ssh.conf
+backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf etc/wolos/nftables.d/ssh.conf etc/wolos/nftables.d/airplay.conf
   etc/zsh/zshenv etc/zellij/config.kdl etc/mise/config.toml etc/fish/conf.d/wolos.fish
-  etc/profile.d/wolos-console.sh)
+  etc/profile.d/wolos-console.sh etc/profile.d/wolos-ime.sh)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
 _wolos_commit=11cd053405c386404b3d811d842fb82b361209ab

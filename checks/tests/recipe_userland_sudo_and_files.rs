@@ -87,3 +87,29 @@ fn files_offers_the_full_check_and_the_action_can_only_start_wol_analyze() {
     assert!(!window.contains("malware-signatures"));
     assert!(!c.contains("malware-signatures"));
 }
+
+/// A9 follow-up: every login-shell profile wolos-system ships in /etc/profile.d (the console
+/// prompt, the IME session exports) is in its backup=, so a local edit survives an upgrade and
+/// pacman leaves a .pacnew instead of overwriting it.
+#[test]
+fn every_profile_d_script_is_kept_across_upgrades() {
+    let backup = Command::new("bash")
+        .current_dir(repo("wolos-system"))
+        .arg("-c")
+        .arg("source ./PKGBUILD; printf '%s\\n' \"${backup[@]}\"")
+        .output()
+        .unwrap();
+    let backup = String::from_utf8_lossy(&backup.stdout);
+    let dir = repo("desktop/overlay/etc/profile.d");
+    let mut names: Vec<String> = fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert!(names.contains(&"wolos-ime.sh".to_string()), "{names:?}");
+    for n in names {
+        let want = format!("etc/profile.d/{n}");
+        assert!(backup.lines().any(|l| l == want), "{want} not in backup=");
+    }
+}
