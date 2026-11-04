@@ -21,7 +21,7 @@ depends=(hyprland-wolos gtk4 gtk4-layer-shell libadwaita pam systemd clamav plym
 provides=(default-cursors)
 conflicts=(default-cursors)
 replaces=(default-cursors)
-# python: design/tools/east/walls.py generates the Moon Gate in every theme's dye (_east_walls_build).
+# python: design/tools/brand/walls.py generates the Moon Gate in every theme's dye (_brand_walls_build).
 makedepends=(cargo clang mold sccache pkgconf hyprland-wolos git nautilus pipewire python)
 options=(!debug !lto)
 backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login etc/wolos/nftables.conf etc/wolos/nftables.d/ssh.conf etc/wolos/nftables.d/airplay.conf
@@ -55,23 +55,26 @@ prepare() {
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
 }
 
-# The east wallpapers (design east/wallpapers/README.md): the Moon Gate in each built-in theme's dye,
+# The brand wallpapers (design brand/wallpapers/README.md): the Moon Gate in each built-in theme's dye,
 # generated from the theme files (not in git; 23 themes x day/night x 4k/16:10, ~1 s, ~133 MB of SVG
 # text), and its parameter set, which the desktop's day/night and theme transition reads
 # (shell kit/gate.rs). $1: the wolos tree; $2: the staging directory.
-_east_walls_build() {
+_brand_walls_build() {
   local d=$1/design e=$2
-  [ -f "$d/tools/east/walls.py" ] || return 0
+  if [ ! -f "$d/tools/brand/walls.py" ]; then
+    echo "error: $d/tools/brand/walls.py is missing: the design tree is not the one with the brand generators, and the package would ship no themed wallpapers" >&2
+    return 1
+  fi
   rm -rf "$e"
   install -d "$e/themes"
-  WOLOS_THEMES="$1/crates/core/src/theme/builtin" python3 -I "$d/tools/east/walls.py" themes siggate --out "$e/themes"
-  python3 -I "$d/tools/east/walls.py" gate --params --out "$e/wolos-gate.params.json"
+  WOLOS_THEMES="$1/crates/core/src/theme/builtin" python3 -I "$d/tools/brand/walls.py" themes siggate --out "$e/themes"
+  python3 -I "$d/tools/brand/walls.py" gate --params --out "$e/wolos-gate.params.json"
 }
 
 # The shipped gate (signature dye), Cachoeira Station and the earlier places when present, and what
-# _east_walls_build made, into usr/share/wolos/wallpapers. $1: the wolos tree; $2: staging; $3: pkgdir.
-_east_walls_package() {
-  local w=$1/design/east/wallpapers e=$2 p
+# _brand_walls_build made, into usr/share/wolos/wallpapers. $1: the wolos tree; $2: staging; $3: pkgdir.
+_brand_walls_package() {
+  local w=$1/design/brand/wallpapers e=$2 p
   [ -d "$e" ] || return 0
   local wp=$3/usr/share/wolos/wallpapers
   install -d "$wp/themes"
@@ -84,7 +87,7 @@ _east_walls_package() {
 
 build() {
   local _repo=$srcdir/wolos
-  _east_walls_build "$_repo" "$srcdir/east-walls"
+  _brand_walls_build "$_repo" "$srcdir/brand-walls"
   export CARGO_TARGET_DIR=$srcdir/target
   "$_repo/tools/build-rust.sh" "$srcdir/stage"
   "$_repo/desktop/hyprland/build-plugins.sh" "$srcdir/stage"
@@ -109,7 +112,7 @@ package() {
   local d=$_repo/design
   [ ! -d "$d/icons" ] || sh "$d/icons/install.sh" "$pkgdir/usr/share/icons/WolOS"
   [ ! -d "$d/wallpapers" ] || { install -d "$pkgdir/usr/share/wolos/wallpapers"; cp -R "$d/wallpapers/." "$pkgdir/usr/share/wolos/wallpapers/"; }
-  _east_walls_package "$_repo" "$srcdir/east-walls" "$pkgdir"
+  _brand_walls_package "$_repo" "$srcdir/brand-walls" "$pkgdir"
   [ ! -d "$d/tokens" ] || { install -d "$pkgdir/usr/share/wolos/tokens"; cp -R "$d/tokens/." "$pkgdir/usr/share/wolos/tokens/"; }
   [ ! -d "$d/icons/store" ] || install -Dm644 -t "$pkgdir/usr/share/wolos/store-icons" "$d"/icons/store/*.svg
   [ ! -f "$d/brand/wolos-splash.png" ] || install -Dm644 "$d/brand/wolos-splash.png" "$pkgdir/usr/share/plymouth/themes/wolos/wolos.png"

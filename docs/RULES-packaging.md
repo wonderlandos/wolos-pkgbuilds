@@ -77,6 +77,8 @@ relaxed by adding an entry.
 - RP-034: `wolos-base` lists hyprland-wolos as a local dep but reaches it through wolos-system.
 - RP-051: boot_setup_sealed_units.rs, hypr_conf.rs, image_repo_sums.rs, modules.rs and modules_files.rs test files of
   the sibling repos or the image (or a recipe directory not yet here), not a directory of this repo.
+- RP-051: recipe_firewall_files.rs and recipe_network_vpn.rs (NET-3) test files that read wolos-system through the
+  overlaid tree and name no package directory of their own.
 
 ## Not automated
 

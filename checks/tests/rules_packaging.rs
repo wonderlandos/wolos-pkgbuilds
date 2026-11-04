@@ -22,6 +22,9 @@ const BASELINE: &[(&str, &str)] = &[
     ("RP-051", "hypr_conf.rs"),
     ("RP-051", "image_repo_sums.rs"),
     ("RP-051", "modules.rs"),
+    // NET-3: the firewall rule files and the OpenVPN plugin are files of the wolos-system package, checked from its recipe.
+    ("RP-051", "recipe_firewall_files.rs"),
+    ("RP-051", "recipe_network_vpn.rs"),
 ];
 
 fn root() -> PathBuf {
