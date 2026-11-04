@@ -4,7 +4,7 @@
 # (next to this file). The install script populates them into the system keyring.
 pkgname=wolos-keyring
 pkgver=2026.10.28
-pkgrel=2
+pkgrel=3
 pkgdesc='WolOS package signing keys'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

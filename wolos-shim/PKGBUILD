@@ -5,7 +5,7 @@
 pkgname=wolos-shim
 pkgver=16.1
 _fedrel=7
-pkgrel=2
+pkgrel=3
 pkgdesc='Signed first-stage boot loader and key enrolment screen (Fedora build, unmodified)'
 arch=(x86_64)
 url='https://github.com/rhboot/shim'

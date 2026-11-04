@@ -8,7 +8,7 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-console
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS Console module: starship, fzf, zoxide, eza, bat, fd, ripgrep, fish, nushell, ghostty, kitty'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

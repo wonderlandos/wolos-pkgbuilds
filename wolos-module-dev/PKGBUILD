@@ -10,7 +10,7 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-dev
 pkgver=0.12.0
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS Developer module: git, GitHub CLI, mise, Code - OSS, lazygit, btop, zellij, podman, Crystal and Cryswol'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'

@@ -5,7 +5,7 @@
 # 0.56.2-4. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.56.2
-pkgrel=5
+pkgrel=6
 pkgdesc='The WolOS window compositor: a tuned fork with the WolOS patches'
 arch=(x86_64)
 url='https://github.com/hyprwm/Hyprland'
