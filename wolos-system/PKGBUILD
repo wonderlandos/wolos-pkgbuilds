@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -26,10 +26,10 @@ backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login
   etc/profile.d/wolos-console.sh etc/profile.d/wolos-ime.sh)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
-_wolos_commit=baeb1c671580bd818cb940f316ba9ffa31076f76
+_wolos_commit=9dcf9b08b0dad421d62b7b654a233d1de51f6836
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
-_brand_commit=6c6d2c0511b8d1427d81929d537113e71e7be737
-_shell_commit=463d730d496ad0d83d01a014686b3fe93f953e9e
+_brand_commit=097d2e6ae8bbdc579313914cd6ddda9348d7fe6d
+_shell_commit=9c1c57b90fd991db5e219637d00fac4b303145ec
 # Image defaults the code relies on, kept here until wolos files/ carries them (same install paths):
 # ntsync at boot (Games Doctor), the CJK/Arabic/Hebrew font fallbacks (language picker, terminal),
 # power-profiles-daemon on (Energy Mode), .local names through nss-mdns (Printers, AirPlay, sharing).
