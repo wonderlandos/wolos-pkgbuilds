@@ -1,0 +1,151 @@
+== ours-diff-u-differs
+@@ -1,5 +1,6 @@
+ a
+-b
++B
+ c
+ d
+-e
++f
++g
+rc=1
+== ours-diff-u-same
+rc=0
+== ours-cmp-s-same
+rc=0
+== ours-cmp-s-differ
+rc=1
+== ours-cmp-s-missing
+rc=2
+== third-diff-u-label
+--- one
++++ two
+@@ -1,5 +1,6 @@
+ a
+-b
++B
+ c
+ d
+-e
++f
++g
+rc=1
+== third-diff-up
+@@ -1,5 +1,6 @@
+ a
+-b
++B
+ c
+ d
+-e
++f
++g
+rc=1
+== third-diff-c
+***************
+*** 1,5 ****
+  a
+! b
+  c
+  d
+! e
+--- 1,6 ----
+  a
+! B
+  c
+  d
+! f
+! g
+rc=1
+== third-diff-Nupr
+diff -Nupr da/new db/new
+@@ -0,0 +1 @@
++3
+diff -Nupr da/only db/only
+@@ -1 +0,0 @@
+-only
+diff -Nupr da/x db/x
+@@ -1 +1 @@
+-1
++2
+rc=1
+== third-diff-rq
+Only in db: new
+Only in da: only
+Files da/x and db/x differ
+rc=1
+== third-diff-w
+rc=0
+== third-diff-suppress-sbs
+b		   |	B
+e		   |	f
+		   >	g
+rc=1
+== third-diff-color
+^[[36m@@ -1,5 +1,6 @@^[[0m
+ a
+^[[31m-b^[[0m
+^[[32m+B^[[0m
+ c
+ d
+^[[31m-e^[[0m
+^[[32m+f^[[0m
+^[[32m+g^[[0m
+rc=1
+== third-diff-stdin
+@@ -1,5 +1,6 @@
+ a
+-b
++B
+ c
+ d
+-e
++f
++g
+rc=1
+== third-diff-process-subst
+@@ -1 +1 @@
+-a
++b
+rc=1
+== third-diff-no-newline
+5c5
+< e
+---
+> e
+\ No newline at end of file
+rc=1
+== third-diff-version
+diff
+== extra-diff-normal
+2c2
+< b
+---
+> B
+5c5,6
+< e
+---
+> f
+> g
+rc=1
+== extra-diff-ed
+5c|f|g|.|2c|B|.|rc=1
+== extra-diff-i
+rc=0
+== extra-diff-B
+rc=0
+== extra-diff-binary
+Binary files bin1 and bin2 differ
+rc=1
+== extra-cmp-plain
+a b differ: char 3, line 2
+rc=1
+== extra-cmp-l
+ 3 142 102
+ 9 145 146
+rc=1
+== extra-cmp-n
+a b differ: char 3, line 2
+rc=1
+== extra-cmp-stdin
+rc=0

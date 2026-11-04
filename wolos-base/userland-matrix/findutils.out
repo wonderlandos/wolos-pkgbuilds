@@ -1,0 +1,208 @@
+== ours-mindepth-name-not-exec
+state/pacdb-old
+rc=0
+== ours-printf-P-nl
+a.o
+broken
+good
+new.pkg.tar.zst
+sub/b.o
+sub/c.txt
+== ours-printf-P-nul
+a.o|broken|good|new.pkg.tar.zst|sub/b.o|sub/c.txt|
+== ours-printf-P-l-nul
+/nonexistent|a.o|broken|good|
+== ours-L-type-l-printf-delete
+Removing broken
+b2
+b2/a.o
+b2/good
+b2/new.pkg.tar.zst
+b2/sub
+b2/sub/b.o
+b2/sub/c.txt
+== ours-name-o-delete
+b3
+b3/broken
+b3/good
+b3/new.pkg.tar.zst
+b3/sub
+b3/sub/c.txt
+== ours-newer
+build/new.pkg.tar.zst
+== ours-printf-f
+new.pkg.tar.zst
+== ours-printf-f-space
+a.o 
+== ours-printf-s-f
+0 a.o
+0 new.pkg.tar.zst
+== ours-prune-user
+state
+rc=1
+== ours-update-cmdline-sed
+root=x rootflags=subvol=@wolos-b,compress=zstd
+== ours-update-L-cp-t
+stage
+stage/new.pkg.tar.zst
+== ours-update-exec-semicolon
+rc=0
+== ours-update-exec-plus-fails
+rc=1
+== ours-update-exec-nomatch
+rc=0
+== ours-update-entries-delete
+e2/loader/entries
+e2/loader/entries/wolos-a.conf
+== ours-update-efi-delete
+e3/EFI/wolos
+e3/EFI/wolos/wolos-a.efi
+== ours-scx-vmlinuz
+mods/6.1-wolos/vmlinuz
+== ours-lint-prune-print0
+proj/b/mirrorlist-x|proj/mirrorlist|proj/pacman.conf|
+== ours-exec-grep-lZ-xargs
+./script.sh
+== ours-exec-sha256-plus
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  build/a.o
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  build/new.pkg.tar.zst
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  build/sub/b.o
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  build/sub/c.txt
+== ours-newer-two-dirs
+src/main.cr
+assets/a.png
+== ours-not-path
+./src/main.cr
+== ours-delete-not-name
+b4
+b4/broken
+b4/good
+b4/sub
+b4/sub/b.o
+b4/sub/c.txt
+== ours-type-f-wc
+4
+== ours-mindepth-printf-f
+a.o
+broken
+good
+new.pkg.tar.zst
+sub
+== ours-not-path-git
+proj/PKGBUILD
+proj/a/src/mirrorlist
+proj/b/mirrorlist-x
+proj/checks/pacman.conf
+proj/mirrorlist
+proj/pacman.conf
+== ours-xargs-0-r-empty
+rc=0
+== ours-xargs-0-r-args
+a b
+== ours-xargs-0-sha256-dd
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  newer.pkg.tar.zst
+73cb3858a687a8494ca3323053016282f3dad39d42cf62ca4e79dda2aac7d9ac  ref
+== ours-xargs-basename
+cc
+== ours-xargs-0-r-grep
+src/main.cr
+== third-execdir-touch-plus
+rc=0
+t2/d 0
+t2/f 0
+== third-depth-empty-or-xtype
+t3
+t3/a.ko.zst
+t3/d
+t3/d/e
+t3/d/e/g
+t3/f
+t3/hard
+t3/sl
+== third-xtype-f
+tp/a.ko.zst
+tp/d/e/g
+tp/f
+tp/hard
+tp/sl
+== third-xtype-l
+tp/lnk/dead
+tp/lnk/ok
+== third-perm-u-plus-x
+tp/hard
+tp/f
+== third-perm-links-plus1
+tp/f|tp/hard|
+== third-links-1
+tp/a.ko.zst|tp/d/e/g|
+== third-links-exec-stat
+tp/f
+tp/hard
+== third-follow
+
+== third-L-type-l-delete
+t4/lnk
+== third-maxdepth0-empty-exec
+empty
+== third-prune-printf-l
+f
+== third-not-type-d-name
+tp/a.ko.zst
+== third-type-d-empty-delete
+t5
+t5/a.ko.zst
+t5/d
+t5/d/e
+t5/d/e/g
+t5/f
+t5/hard
+t5/lnk
+t5/lnk/dead
+t5/lnk/ok
+t5/sl
+== third-exec-plus-zstd-style
+tp/a.ko.zst
+== third-regex
+tp/a.ko.zst
+== third-mtime
+4
+== third-newermt
+4
+== third-samefile
+tp/f
+tp/hard
+== third-quit
+rc=0
+== third-print0-sort-z
+tp/a.ko.zst|
+== third-xargs-a-file
+a b
+== third-xargs-r-long
+rc=0
+== extra-ignore-readdir-race
+tp
+== extra-xargs-t-trace
+echo a
+a
+== extra-printf-formats
+tp/f|tp|f|1|f|744|2|2||f|tp
+== extra-regextype
+tp/d/e/g
+tp/f
+== extra-files0-from
+tp/f
+tp/d
+== extra-xargs-P
+a
+b
+== extra-xargs-I
+xa
+xb
+== extra-xargs-d
+a b c
+== extra-xargs-E
+a
+== extra-xargs-exit-255
+rc=124
+== extra-xargs-exit-fail
+rc=123

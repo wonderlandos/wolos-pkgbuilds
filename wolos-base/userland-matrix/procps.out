@@ -1,0 +1,53 @@
+== ours-ps-ax-pid-ppid
+found 0
+== ours-ps-o-C-header
+ PID PPID ELAPSED COMMAND
+== ours-ps-comm
+sleep
+== ours-pgrep-x
+N
+rc=1
+== ours-pgrep-x-u
+N
+== ours-pgrep-f
+N
+== ours-pgrep-c
+N
+== ours-pgrep-o-n
+oldest-le-newest
+== ours-pgrep-af
+N sleep 300
+== ours-pgrep-u-name
+N
+== ours-pgrep-u-only
+N
+== ours-pgrep-bracket-trick
+N
+== ours-pkill-x-nomatch
+rc=1
+== ours-pkill-signal-uid-exact
+rc=0
+done
+== ours-pkill-U-f
+rc=0
+killed
+== ours-pkill-f
+rc=0
+killed
+== ours-pkill-KILL-u-f
+rc=0
+killed
+== ours-free-m
+1
+== extra-uptime-p
+up
+== extra-top-b
+top - 
+== extra-pgrep-l
+N sleep
+== extra-pidof
+N
+== extra-sysctl-n
+Linux
+== extra-watch-version
+watch

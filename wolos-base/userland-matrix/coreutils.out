@@ -1,0 +1,207 @@
+== ours-cp-reflink-t
+3
+== ours-cp-a-reflink
+-rw-r--r-- f  
+lrwxrwxrwx l -> f
+-rw-r--r-- s  
+drwxr-xr-x sub  
+== ours-cp-L
+3
+== ours-install-Dm644-stdin
+644
+hi
+== ours-install-d
+755
+== ours-install-Dm755-file
+755
+== ours-ln-s
+uu-ls
+== ours-ln-sfn
+b
+== ours-mv-T
+x
+mvg 
+== ours-rm-rf-missing
+rc=0
+rc=0
+== ours-mkdir-p-mode
+700
+== ours-mktemp-d
+dir
+file
+== ours-readlink-f-m
+d/f
+d/nosuch/x
+f
+== ours-realpath
+d/f
+d/y
+sub
+== ours-sha256sum
+af8fcee01ae24dc6c3e667d5f3aaba900637223e1cf618b92c4c548cf97e81f5  d/s
+af8fcee01ae24dc6c3e667d5f3aaba900637223e1cf618b92c4c548cf97e81f5  -
+af8fcee01ae24dc6c3e667d5f3aaba900637223e1cf618b92c4c548cf97e81f5  d/s
+d/s: OK
+== ours-sha512-md5-b2
+c50b8a351c4f73c8f4faac01e26bcbff  d/s
+0d7bdb193b2d99c7
+60448196cba8c013
+== ours-sort-z
+a|b|c|
+== ours-sort-k-V-u
+9 a
+10 b
+9
+10
+b
+a
+== ours-stat-c
+644 regular file 14 d/f
+regular file
+N:N
+== ours-touch-d-h
+N
+0
+rc=0
+== ours-chmod
+440
+500
+700
+== ours-chown-self
+rc=0
+rc=0
+== ours-truncate
+4096
+0
+== ours-dd
+4096
+ \n a \n
+rc=0
+== ours-du
+6
+1
+40K
+N
+== ours-df
+N
+Filesystem
+Filesystem Type
+== ours-date
+1970-01-01T00:00:00Z
+N
+1793793600
+1970-01-02T00:00:00+00:00
+== ours-head-tail
+ b \n a \n c
+b,a,a,c, c \n
+b
+== ours-cut-tr-wc
+b:c
+ab
+a b
+3
+6
+== ours-tee-a
+2
+== ours-timeout
+rc=0
+rc=124
+rc=124
+rc=124
+== extra-timeout-kill-status
+rc=137
+rc=124
+== ours-env
+12
+unset
+1
+== ours-id-whoami
+N
+xN
+same
+== ours-basename-dirname
+c
+c
+/a/b
+y w 
+== ours-seq-yes-printf
+1,2,3,2,4,6,8,08,09,10,ab,ab,a-00042-ff
+== ours-echo-n-e
+ab	c
+-- x
+== ours-test-exprs
+e
+L
+notnewer
+s
+empty
+gt
+== ours-expr
+5
+bc
+5
+0
+rc=1
+== ours-nproc-numfmt
+N
+2.0K
+1024
+== ours-od-base64
+ 62 0a 61 0a
+aGVsbG8K
+hello
+NBUQU===
+aGkK
+== ours-uniq-comm-join-paste
+ 2 a
+ 1 b
+3
+a 1 2
+a 1,a 2
+== ours-ls
+f,l,s,sub,drwx------
+f
+14
+d/sub/
+f*,l@,s,sub/,
+== ours-sleep-sync-nice
+rc=0
+rc=0
+5
+rc=0
+== ours-stdbuf-split-shuf
+x
+sp_aa,sp_ab,1,2,3,3,2,1,
+== ours-uname-hostid-tty
+Linux
+xxxxxx
+N
+rc=1
+== ours-cat-fmt-fold-nl
+ 1 a
+ 2 b
+a b c ,d e f ,g, 1 x
+ 2 y
+aaa,bbb ccc,
+== ours-shred-unlink-link
+gone
+gone2
+2
+== ours-mkfifo-mknod
+fifo
+fifo2
+== ours-who-users-groups
+rc=0
+rc=0
+N
+== ours-factor-pr-ptx-tsort
+12: 2 2 3
+a,b,c, x \n
+ a \t b \n
+== ours-printenv-pwd-logname
+bar
+x
+rc=0
+== ours-version-help
+cat
+N

@@ -3,8 +3,11 @@
 # Non-GNU tools take the GNU names (uutils coreutils, sudo-rs) and stand in for the GNU packages
 # through provides/conflicts, so `base`, `base-devel` and everything that depends on coreutils or
 # sudo still resolve. glibc, gcc-libs and bash stay (Steam, Proton, NVIDIA; Arch hooks need bash).
-# GNU findutils, diffutils and tar stay too: no uutils findutils/diffutils at the snapshot, and
-# pacman/dkms scripts use GNU tar options (bsdtar is shipped and preferred by makepkg/mkinitcpio).
+# GNU findutils, diffutils, procps-ng, util-linux and tar stay too (decided 2026-11-04, evidence in
+# wolos-iso README "Userland and GNU"): Arch `extra` has only uutils-coreutils, so a swap would mean
+# building uutils-findutils ourselves; diffutils 0.6.0 and procps lack flags that devtools, dkms and
+# the updater use; pacman/dkms scripts use GNU tar options (bsdtar is shipped and preferred by
+# makepkg/mkinitcpio). ./userland-matrix.sh is the gate for the next swap (checks/tests/recipe_userland_uutils.rs).
 # Ships /usr/share/wolos/base.manifest (sha256 + path of every base file: ./base.manifest, written by
 # ./prebuild.sh before the build; wolos-build runs it) and the os-release of this release.
 # Built with makepkg --nodeps (./build.conf): its depends are the installed system's, nothing it builds
