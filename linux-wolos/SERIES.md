@@ -6,13 +6,15 @@ Shape: stable core + small WolOS series + fixed userspace interface + KMI.
 |---|---|
 | stable core | github.com/wonderlandos/linux at the tag pinned by `linux-wolos/PKGBUILD` (public) |
 | config | the fork's `kernel/configs/wolos.config` (public): latency, sched_ext, MODVERSIONS, datacenter-only drivers off |
-| perf series | commits on the fork branch `wolos-7.3`, one per patch; nothing is patched in this repo |
+| perf series | commits on the fork branch `wolos-7.3.1`, one per patch; nothing is patched in this repo |
 | scheduler | `kernel/scx_wolos/` in the wolos repo (sched_ext BPF + loader + unit; interface: `INTERFACE.md` there); built and tested in-tree, not shipped in v0.12 |
 | KMI | `kmi/` symbol freeze per release line |
 
-## Series (fork branch `wolos-7.3`, tag `wolkernel-1.0-7.3`)
+## Series (fork branch `wolos-7.3.1`, tag `wolkernel-1.0-7.3.1`)
 
-The branch `wolos-7.3` of github.com/wonderlandos/linux is the branch `wolos` (f60fabe) plus 21 commits: one commit per patch below (subject = the name in the first column, numbers 0019-0029 are unused) and a last commit that folds the config fragment into `kernel/configs/wolos.config`. The PKGBUILD pins the release tag (`wolkernel-<wolkernel>-<linux>`, currently the head of `wolos-7.3`) by the sha256 of its tarball; `tools/bump-kernel.sh TAG` moves both. Commit messages carry the subject, not the number.
+The branch `wolos-7.3.1` of github.com/wonderlandos/linux is Linux 7.3.1 (stable, `79a9076`) plus 37 commits: the base commits of the former `wolos` branch (16: desktop and gaming config, the list of removed interfaces, README.wolos.md, the former 0001-0003, the APFS driver, the `wolos_compat` KUnit and the legacy fixes), one commit per patch below (subject = the name in the first column, numbers 0019-0029 are unused) and a last commit that folds the config fragment into `kernel/configs/wolos.config`. The PKGBUILD pins the release tag (`wolkernel-<wolkernel>-<linux>`, currently the head of `wolos-7.3.1`) by the sha256 of its tarball; `tools/bump-kernel.sh TAG` moves both. Commit messages carry the subject, not the number.
+
+Rebase from `wolos-7.3` (tag `wolkernel-1.0-7.3`): that branch sat on mainline `83f32c7` (Oct 27, the 7.4 merge window, whose Makefile still said 7.3.0), 16 645 commits past the 7.3 release; it was not 7.3 stable. `git rebase --onto v7.3.1 83f32c7` replays the 37 commits; `git range-diff` shows 29 identical and 8 changed; four of those needed hand work and four differ only in context lines (the oom and futex_waitv commits, and the two README.wolos.md commits after the base line was reworded). The hand work: `futex: bounded spin` (7.3.1 reads `timeout->task`, mainline 7.4 has `hrtimer_sleeper_task_get()`), `/sys/kernel/wolos hint interface` (the Kconfig context had `PREFERRED_CPU`, a 7.4 symbol, which is not carried), `audit: no syscall slow path` (7.3.1 has no `audit_rule_account()`; the count is raised in `audit_add_rule()` instead) and the APFS driver (`struct mnt_idmap *` without `const`, as 7.3.1's inode operations take it). Config: `make olddefconfig` with `wolos.config` loses no WolOS-requested option; what differs from the old base is 7.4-only symbols (`STEAL_GOVERNOR`, `PREFERRED_CPU`, `TCP_CONG_ROCCET`, and others).
 
 The fork carries the former 0001-0003 (bounded futex spin, `/sys/kernel/wolos` hints, i915 deadline boost) and the public legacy fixes (lazy audit syscall work, int $0x80 from 64-bit, retbleed stuffing, kernel defaults; KUnit `wolos_compat`).
 

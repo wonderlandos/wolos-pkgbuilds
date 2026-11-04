@@ -95,7 +95,7 @@ fn freebsd_kernel_parts_are_gone() {
     }
 }
 
-/// linux-wolos/VERSION is the one place the product version lives: "WolKernel 1.0 (7.3)" =
+/// linux-wolos/VERSION is the one place the product version lives: "WolKernel 1.0 (7.3.1)" =
 /// WolKernel release + the Linux base in parentheses. PKGBUILDs, uname -v and the README follow it.
 #[test]
 fn version_has_one_source_and_shows_the_linux_base_in_parentheses() {
@@ -107,7 +107,7 @@ fn version_has_one_source_and_shows_the_linux_base_in_parentheses() {
             .to_string()
     };
     let (wk, linux) = (get("wolkernel"), get("linux"));
-    assert_eq!((wk.as_str(), linux.as_str()), ("1.0", "7.3"));
+    assert_eq!((wk.as_str(), linux.as_str()), ("1.0", "7.3.1"));
     let shown = format!("WolKernel {wk} ({linux})");
     assert!(
         read("linux-wolos/README.md").contains(&shown),
