@@ -1,0 +1,128 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: klee <71413974+kleeedolinux@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 18:55:00 +0000
+Subject: [PATCH] start-hyprland: a crash restarts with the config, never safe
+ mode; a second crash within 30 s ends it
+
+Upstream restarts a crashed Hyprland with --safe-mode, which drops the
+config: on WolOS that is a bare desktop with no shell, no lock bindings
+and no theme (QA-LIVE-22). The restart keeps the same arguments and
+config, and still the crash lock (0005). A second unclean exit within
+30 s ends start-hyprland with status 1, so the session ends and the login
+window comes back instead of a compositor that keeps dying.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/helpers/WolosRestart.hpp   | 28 ++++++++++++++++++++++++++++
+ start/src/main.cpp             | 21 +++++++++++++++++----
+ tests/helpers/WolosRestart.cpp | 20 ++++++++++++++++++++
+ 3 files changed, 65 insertions(+), 4 deletions(-)
+ create mode 100644 src/helpers/WolosRestart.hpp
+ create mode 100644 tests/helpers/WolosRestart.cpp
+
+diff --git a/src/helpers/WolosRestart.hpp b/src/helpers/WolosRestart.hpp
+new file mode 100644
+index 0000000..256900a
+--- /dev/null
++++ b/src/helpers/WolosRestart.hpp
+@@ -0,0 +1,28 @@
++#pragma once
++
++#include <chrono>
++#include <optional>
++
++// WolOS crash restart policy for start-hyprland (QA-LIVE-22). Pure: tested in tests/helpers/WolosRestart.cpp.
++
++namespace WolosRestart {
++    // A second crash this soon after the first ends start-hyprland with status 1: the session ends and the login
++    // window comes back, instead of a desktop that keeps falling over.
++    inline constexpr std::chrono::seconds REPEAT_WINDOW{30};
++
++    enum class eAfterCrash {
++        RESTART, // start Hyprland again, with the same arguments and config
++        GIVE_UP, // exit 1
++    };
++
++    // What start-hyprland does after an unclean exit at `now`; `lastCrash` is the previous unclean exit, if any.
++    inline constexpr eAfterCrash afterCrash(std::optional<std::chrono::steady_clock::time_point> lastCrash, std::chrono::steady_clock::time_point now) {
++        return lastCrash && now - *lastCrash < REPEAT_WINDOW ? eAfterCrash::GIVE_UP : eAfterCrash::RESTART;
++    }
++
++    // Upstream restarts a crashed Hyprland with --safe-mode, which drops the person's config: a bare desktop with
++    // no WolOS shell, bindings or theme. WolOS restarts with its config, always (the crash lock still applies).
++    inline constexpr bool safeModeAfterCrash() {
++        return false;
++    }
++}
+diff --git a/start/src/main.cpp b/start/src/main.cpp
+index f28a04b..439ffc9 100644
+--- a/start/src/main.cpp
++++ b/start/src/main.cpp
+@@ -6,6 +6,10 @@
+ #include "helpers/Nix.hpp"
+ #include "core/State.hpp"
+ #include "core/Instance.hpp"
++#include "../../src/helpers/WolosRestart.hpp"
++
++#include <chrono>
++#include <optional>
+ 
+ using namespace Hyprutils::CLI;
+ 
+@@ -101,8 +105,9 @@ int main(int argc, const char** argv, const char** envp) {
+     if (Nix::shouldUseNixGL())
+         g_logger->log(Hyprutils::CLI::LOG_DEBUG, "Hyprland was compiled with Nix - will use nixGL");
+ 
+-    bool safeMode    = false;
+-    bool lockedCrash = false;
++    bool                                                 safeMode    = false;
++    bool                                                 lockedCrash = false;
++    std::optional<std::chrono::steady_clock::time_point> lastCrash;
+ 
+     while (true) {
+         g_instance     = makeUnique<CHyprlandInstance>();
+@@ -111,8 +116,16 @@ int main(int argc, const char** argv, const char** envp) {
+         g_instance.reset();
+ 
+         if (!RET) {
+-            g_logger->log(Hyprutils::CLI::LOG_ERR, "Hyprland exit not-cleanly, restarting");
+-            safeMode = true;
++            // WolOS (QA-LIVE-22): the same config and the crash lock, never --safe-mode; a second crash within
++            // WolosRestart::REPEAT_WINDOW ends here with 1, so the login window comes back.
++            const auto NOW = std::chrono::steady_clock::now();
++            if (WolosRestart::afterCrash(lastCrash, NOW) == WolosRestart::eAfterCrash::GIVE_UP) {
++                g_logger->log(Hyprutils::CLI::LOG_ERR, "Hyprland exit not-cleanly twice within {} s, giving up", WolosRestart::REPEAT_WINDOW.count());
++                return 1;
++            }
++            lastCrash = NOW;
++            g_logger->log(Hyprutils::CLI::LOG_ERR, "Hyprland exit not-cleanly, restarting with the same config");
++            safeMode = WolosRestart::safeModeAfterCrash();
+             continue;
+         }
+ 
+diff --git a/tests/helpers/WolosRestart.cpp b/tests/helpers/WolosRestart.cpp
+new file mode 100644
+index 0000000..f5f435a
+--- /dev/null
++++ b/tests/helpers/WolosRestart.cpp
+@@ -0,0 +1,20 @@
++#include <helpers/WolosRestart.hpp>
++
++#include <gtest/gtest.h>
++
++using namespace WolosRestart;
++using namespace std::chrono_literals;
++
++TEST(WolosRestart, aFirstCrashRestartsWithTheWolosConfig) {
++    const auto t = std::chrono::steady_clock::time_point{} + 1h;
++    EXPECT_EQ(afterCrash(std::nullopt, t), eAfterCrash::RESTART);
++    EXPECT_FALSE(safeModeAfterCrash());
++}
++
++TEST(WolosRestart, aSecondCrashWithinThirtySecondsGivesUp) {
++    const auto first = std::chrono::steady_clock::time_point{} + 1h;
++    EXPECT_EQ(afterCrash(first, first + 1s), eAfterCrash::GIVE_UP);
++    EXPECT_EQ(afterCrash(first, first + 29s), eAfterCrash::GIVE_UP);
++    EXPECT_EQ(afterCrash(first, first + 30s), eAfterCrash::RESTART);
++    EXPECT_EQ(afterCrash(first, first + 10min), eAfterCrash::RESTART);
++}

@@ -78,3 +78,79 @@ fn series_names_the_pkgbuild_base() {
         "{base}"
     );
 }
+
+/// `source=(...)` entries of the PKGBUILD (one per line) and `sha256sums=(...)` entries.
+fn array_items(pkgbuild: &str, name: &str) -> Vec<String> {
+    let start = pkgbuild
+        .find(&format!("\n{name}=("))
+        .unwrap_or_else(|| panic!("{name}=( in the PKGBUILD"))
+        + name.len()
+        + 3;
+    let body = &pkgbuild[start..];
+    body[..body.find(')').expect("closing )")]
+        .split_whitespace()
+        .map(|w| w.trim_matches('\'').trim_matches('"').to_owned())
+        .collect()
+}
+
+/// A checksum per source, none merged into another line (a spliced `sha256sums` entry passes
+/// `makepkg --geninteg` nowhere and fails the build on the forge, long after the edit).
+#[test]
+fn pkgbuild_has_one_checksum_per_source_and_one_name_per_line() {
+    let pkgbuild =
+        std::fs::read_to_string(dir().join("PKGBUILD")).expect("hyprland-wolos/PKGBUILD");
+    let sources = array_items(&pkgbuild, "source");
+    let sums = array_items(&pkgbuild, "sha256sums");
+    assert_eq!(sources.len(), sums.len(), "source= and sha256sums= differ in length");
+    for s in &sums {
+        assert!(
+            s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()),
+            "not a sha256: {s}"
+        );
+    }
+    for p in patches() {
+        let n = sources.iter().filter(|s| **s == p).count();
+        assert_eq!(n, 1, "{p} must be in source= exactly once");
+    }
+    // One patch per number: two 0018 files would apply twice or fight over the same hunks.
+    let all = patches();
+    let mut numbers: Vec<&str> = patches_numbers(&all);
+    let before = numbers.len();
+    numbers.dedup();
+    assert_eq!(before, numbers.len(), "two patch files share a number");
+}
+
+fn patches_numbers(names: &[String]) -> Vec<&str> {
+    names.iter().map(|n| &n[..4]).collect()
+}
+
+/// QA-LIVE-22: after a Hyprland crash `start-hyprland` restarts with the person's config, never
+/// with `--safe-mode` (a bare desktop without the shell), and gives up after a second crash
+/// within 30 s so the login window comes back. Patch 0018 carries it, with its gtest.
+#[test]
+fn start_hyprland_restarts_with_the_config_not_safe_mode() {
+    let patch = patches()
+        .into_iter()
+        .find(|n| n.starts_with("0018-start-hyprland-"))
+        .expect("patch 0018 (start-hyprland restart policy)");
+    let text = std::fs::read_to_string(dir().join(&patch)).unwrap();
+    // The upstream line that turned a crash into safe mode is removed, and the policy is used.
+    assert!(
+        text.contains("-            safeMode = true;"),
+        "0018 removes `safeMode = true` after an unclean exit"
+    );
+    assert!(text.contains("safeMode = WolosRestart::safeModeAfterCrash();"));
+    assert!(text.contains("WolosRestart::afterCrash(lastCrash, NOW)"));
+    assert!(text.contains("return 1;"), "a second crash exits with 1");
+    assert!(text.contains("REPEAT_WINDOW{30}"), "the repeat window is 30 s");
+    // Its tests are in the patch and named in SERIES.md.
+    assert!(text.contains("tests/helpers/WolosRestart.cpp"));
+    let md = std::fs::read_to_string(dir().join("SERIES.md")).unwrap();
+    for t in [
+        "WolosRestart.aFirstCrashRestartsWithTheWolosConfig",
+        "WolosRestart.aSecondCrashWithinThirtySecondsGivesUp",
+    ] {
+        assert!(text.contains(&t["WolosRestart.".len()..]), "{t} is in the patch");
+        assert!(md.contains(t), "{t} is named in SERIES.md");
+    }
+}

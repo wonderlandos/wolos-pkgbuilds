@@ -12,6 +12,7 @@ flatpak-wolos  flatpak-wolos        -                                       flat
 helium-browser helium-browser       -                                       helium-browser/
 wolos-mirrorlist wolos-mirrorlist   -                                       wolos-mirrorlist/ snapshot
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
+wolos-webapps wolos-webapps      wolos-system                            wolos-webapps/
 wopkg          wopkg                -                                       wopkg/
 libwol         libwol               -                                       libwol/
 libwolkit      libwolkit            -                                       libwolkit/

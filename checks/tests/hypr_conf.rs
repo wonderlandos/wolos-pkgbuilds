@@ -49,7 +49,7 @@ fn session_starts_hyprland_without_nag_banners() {
     // the WolOS defaults' file as Hyprland's --config when the account's cannot be used (QA-LIVE-33).
     assert_eq!(
         launch,
-        "exec ${bus:+$bus --} start-hyprland \"$@\""
+        "exec ${bus:+$bus --} start-hyprland ${defaults:+-- $defaults}"
     );
     // hyprland-guiutils is not in the image: its "missing" banner must be off (both forms).
     assert_eq!(value("disable_hyprland_guiutils_check"), "true");

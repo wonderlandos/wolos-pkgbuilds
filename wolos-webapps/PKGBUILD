@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-webapps: the system web apps (ADR 0048, wolos docs/modules/webapps.md): Doctor and the kit
+# the apps share, in /usr/share/wolos/webapps/, with each app's launcher entry. Only text and icons:
+# the apps run in the host /usr/bin/wol-webhost (wolos-system) on the engine library of
+# webengine-wolos. The folder is installed by tools/install-webapps.sh of the wolos source, which
+# leaves out the development files (mock-bridge.js, fixtures.js, fixtures/, test/) and reads the app
+# list from webapps/SHIPPED; the entries are the generated webapps/launchers/*.desktop.
+pkgname=wolos-webapps
+pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS system web apps: Doctor and the kit they share'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+# The apps are GPL-2.0-or-later; the kit (webapps/kit) is BSD-2-Clause so any app may ship it.
+license=(GPL-2.0-or-later BSD-2-Clause)
+depends=(wolos-system webengine-wolos)
+makedepends=(git)
+options=(!debug !lto)
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). This recipe builds only
+# after the next bump: the pin must be a commit that has tools/install-webapps.sh, webapps/SHIPPED and
+# webapps/launchers/ (checks/tests/recipe_wolos_webapps.rs fails until it is).
+_wolos_commit=88702475bef751c0978d5e97d5758c803bf570e3
+source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
+sha256sums=(SKIP)
+
+package() {
+  local _repo=$srcdir/wolos
+  "$_repo/tools/install-webapps.sh" "$pkgdir"
+  install -Dm644 "$_repo/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-kit"
+}
