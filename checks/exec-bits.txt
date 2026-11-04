@@ -8,7 +8,7 @@
 # checks/tests/exec_bits.rs fails when a shebang file is missing here, a listed file is gone or has
 # no shebang, or the git index holds a listed file as 100644.
 .github/builder
-helium-browser/helium.sh
+atlas-browser/atlas.sh
 linux-wolos/kmi/kmi.sh
 linux-wolos/prepare.sh
 tools/bump-kernel.sh

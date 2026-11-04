@@ -9,7 +9,9 @@ linux-wolos-v3 linux-wolos          -                                       linu
 linux-wolos-api-headers linux-wolos-api-headers -                         linux-wolos-api-headers/ linux-wolos/VERSION
 hyprland-wolos hyprland-wolos       -                                       hyprland-wolos/
 flatpak-wolos  flatpak-wolos        -                                       flatpak-wolos/
-helium-browser helium-browser       -                                       helium-browser/
+# atlas-browser replaces helium-browser (0.13, ADR 0043; the old recipe is removed, the 0.12 tag keeps it): a repack of the lane's signed artifact;
+# one recipe builds atlas-browser and atlas-browser-locales.
+atlas-browser  atlas-browser        -                                       atlas-browser/
 wolos-mirrorlist wolos-mirrorlist   -                                       wolos-mirrorlist/ snapshot
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
 wolos-webapps wolos-webapps      wolos-system                            wolos-webapps/

@@ -5,7 +5,12 @@
 # - a recipe reads only its own directory and its sources (no $startdir/.., no sibling checkout);
 # - the recipes built from wolos pin one and the same _wolos_commit;
 # - linux-wolos-api-headers and scx-wolos have linux-wolos's VERSION;
-# - helium-browser keeps the paths wolos's Helium theme writes (crates/core/src/theme/helium.rs);
+# - atlas-browser keeps the paths the browser theme of wolos writes (crates/core/src/browser.rs:
+#   /usr/bin/atlas, /opt/atlas/initial_preferences -> /usr/share/atlas/initial_preferences), provides
+#   web-browser, replaces and conflicts with helium-browser, installs no chromedriver, and pins a
+#   signing key whose public half is in keys/pgp (the artifact is checked by makepkg);
+# - L-07: no shipped flags file or launcher default turns off the sandbox, site isolation or web
+#   security, or opens a debugging port (atlas-browser/, any *flags.conf in the repo);
 # - every PKGBUILD is shellcheck-clean as bash at error level (wolos/docs/STANDARDS.md §4; namcap
 #   needs an Arch host, shellcheck runs anywhere; skipped with a note when shellcheck is missing);
 # - sources are pinned (audit A4): a git source carries #commit=<40-hex sha> and SKIP; any other
@@ -17,7 +22,7 @@
 #   rolls and has none (ADR 0030);
 # - same version needs a pkgrel bump: a recipe whose directory differs from the last tag
 #   (git describe --tags) still has that tag's epoch:pkgver-pkgrel -> fail (skipped without a tag).
-# tools/lint.sh --only servers|pkgrel runs one of the last two (checks/tests/recipe_lint_rules.rs).
+# tools/lint.sh --only servers|pkgrel|atlas runs one rule (checks/tests/recipe_lint_rules.rs, recipe_atlas_browser.rs).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
@@ -58,12 +63,33 @@ lint_pkgrel() {
   done
   rm -rf "$old"
 }
+# lint_atlas: the atlas-browser rules above (tools/lint.sh --only atlas runs just these).
+lint_atlas() {
+  local want fpr f unsafe
+  for want in /opt/atlas/initial_preferences /usr/share/atlas/initial_preferences /usr/bin/atlas \
+    'provides=(web-browser)' 'replaces=(helium-browser)' 'conflicts=(helium-browser)'; do
+    grep -qF "$want" atlas-browser/PKGBUILD || bad "atlas-browser lacks $want"
+  done
+  # chromedriver may only be named to be removed (comments aside).
+  if grep -v '^[[:space:]]*#' atlas-browser/PKGBUILD | grep chromedriver | grep -vq 'rm -f'; then
+    bad "atlas-browser installs chromedriver (it is out of the package)"
+  fi
+  for fpr in $(cd atlas-browser && startdir=$PWD bash -c 'set +eu; source ./PKGBUILD >/dev/null 2>&1; printf "%s " "${validpgpkeys[@]}"'); do
+    [ -f "atlas-browser/keys/pgp/$fpr.asc" ] || bad "atlas-browser: no keys/pgp/$fpr.asc for validpgpkeys"
+  done
+  # L-07: the launcher, the desktop file and every flags file the repo ships.
+  unsafe='--no-sandbox|--disable-site-isolation-trials|--disable-web-security|--remote-debugging-'
+  while IFS= read -r -d '' f; do
+    if grep -nE -e "$unsafe" "$f" >&2; then bad "${f#./}: unsafe browser flag in a shipped default (L-07)"; fi
+  done < <(find . \( -path ./.git -o -path ./checks -o -path '*/src' -o -path '*/pkg' \) -prune -o \
+    -type f \( -path './atlas-browser/atlas.sh' -o -path './atlas-browser/atlas.desktop' -o -name '*flags.conf' \) -print0)
+}
 case ${1:-} in
   --only)
-    case ${2:-} in servers) lint_servers ;; pkgrel) lint_pkgrel ;; *) echo "lint: --only servers|pkgrel" >&2; exit 2 ;; esac
+    case ${2:-} in servers) lint_servers ;; pkgrel) lint_pkgrel ;; atlas) lint_atlas ;; *) echo "lint: --only servers|pkgrel|atlas" >&2; exit 2 ;; esac
     [ $fail = 0 ] && echo "lint: ok"; exit $fail ;;
   '') ;;
-  *) echo "usage: tools/lint.sh [--only servers|pkgrel]" >&2; exit 2 ;;
+  *) echo "usage: tools/lint.sh [--only servers|pkgrel|atlas]" >&2; exit 2 ;;
 esac
 seen=" "
 while read -r name dir deps _; do
@@ -84,9 +110,7 @@ for p in linux-wolos-api-headers scx-wolos; do
   grep -qx "_wk=$wk" $p/PKGBUILD && grep -qx "_linux=$lx" $p/PKGBUILD ||
     bad "$p: _wk/_linux differ from linux-wolos/VERSION ($wk, $lx)"
 done
-for want in /opt/helium/initial_preferences /usr/bin/helium; do
-  grep -qF "$want" helium-browser/PKGBUILD || bad "helium-browser lacks $want"
-done
+lint_atlas
 # Sources a recipe may leave at SKIP without being a pinned git source: "dir/file  reason".
 skip_ok='
 wolos-base/base.manifest  written by prebuild.sh from the built packages just before makepkg; no fixed content

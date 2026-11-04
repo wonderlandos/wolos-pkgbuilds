@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# atlas-browser: Atlas, the WolOS browser. A repack of OUR release artifact: the tarball the
+# browser lane (wolos-build atlas/lane.sh package) builds from the engine and our overlay and signs
+# with the WolOS release key. Nothing is compiled here (the compile is the lane's, ADR 0043 D7), so
+# this recipe builds in the clean chroot in seconds. makepkg checks the detached signature against
+# the key pinned in validpgpkeys (the key is in keys/pgp).
+# Installs to /opt/atlas, the launcher /usr/bin/atlas (atlas.sh), the desktop file and the icon.
+# WolOS settings (policies, first-run preferences) come from wolos-system.
+# Split in two packages: the main one keeps the 13 locale packs of the 12 WolOS languages
+# (en-US is the fallback) and leaves chromedriver out; atlas-browser-locales holds the other
+# packs. The symbols zip of the lane is not packaged (profiling artifact only).
+pkgbase=atlas-browser
+pkgname=(atlas-browser atlas-browser-locales)
+pkgver=0.20.3.1
+pkgrel=1
+pkgdesc='Atlas, the WolOS web browser'
+arch=(x86_64)
+url='https://github.com/wonderlandos/atlas'
+# GPL-3.0-or-later: the hunks in files the inherited patch series touches; BSD-3-Clause: our new
+# files and the engine; the rest is the engine's bundled third-party set (its credits list).
+license=(GPL-3.0-or-later BSD-3-Clause LGPL-2.1-or-later MPL-2.0 Apache-2.0 MIT)
+options=(!strip !debug)
+source=("$url/releases/download/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz"
+  "$url/releases/download/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz.asc"
+  atlas.sh
+  atlas.desktop)
+noextract=("atlas-${pkgver}-x86_64_linux.tar.xz")
+sha256sums=('754b886a210c9110cd28a575329978d751a5bf3635aa45916c0eb15897005951'
+            SKIP
+            '6b2c204bc4843be76c3813e44a3657567dbd4ea4d33019f39ad5eb91c6534923'
+            'ca435d5fa58204aaf71720238133e3d456bf63c827542579c721b637cf0f0251')
+validpgpkeys=('C3B6062A2BA6EEABC1DA0F5766C5F2B181374033') # WolOS Repository Signing <onmikron@gmail.com>
+
+# The 13 packs of the main package: the 12 languages of wolos core::region::LANGUAGES (English
+# twice, UK and US; Spanish twice, Spain and Latin America, which Chromium names separately).
+_main_locales=(en-US en-GB pt-BR pt-PT es es-419 fr de it nl pl ja zh-CN)
+
+prepare() {
+  bsdtar -xf "atlas-${pkgver}-x86_64_linux.tar.xz"
+}
+
+_tree() { printf '%s' "$srcdir/atlas-${pkgver}-x86_64_linux"; }
+
+package_atlas-browser() {
+  pkgdesc='Atlas, the WolOS web browser'
+  depends=(alsa-lib at-spi2-core cairo dbus expat fontconfig gtk3 hicolor-icon-theme libcups
+    libdrm libsecret libva libxkbcommon mesa nspr nss pango ttf-liberation xdg-utils)
+  optdepends=('libpulse: audio through PulseAudio (PipeWire is the default)'
+    'kdialog: Qt file dialogs'
+    'qt6-base: Qt theme integration (libqt6_shim)'
+    'qt5-base: Qt theme integration (libqt5_shim)'
+    'atlas-browser-locales: the other interface languages')
+  provides=(web-browser)
+  replaces=(helium-browser)
+  conflicts=(helium-browser)
+  local _dir l
+  _dir=$(_tree)
+  install -d "$pkgdir/opt/atlas"
+  cp -a "$_dir/." "$pkgdir/opt/atlas/"
+  # Ours replace the tarball's: the launcher sets the environment, the desktop file names the app.
+  # chromedriver is a developer tool and 22 MB.
+  rm -f "$pkgdir/opt/atlas/atlas.desktop" "$pkgdir/opt/atlas/product_logo_256.png" \
+    "$pkgdir/opt/atlas/apparmor.cfg"
+  rm -f "$pkgdir/opt/atlas/chromedriver"
+  # Only the 13 packs stay; the rest go to the locales package.
+  find "$pkgdir/opt/atlas/locales" -name '*.pak' -type f -delete
+  install -d "$pkgdir/opt/atlas/locales"
+  for l in "${_main_locales[@]}"; do
+    install -m644 "$_dir/locales/$l.pak" "$pkgdir/opt/atlas/locales/$l.pak"
+  done
+  # Chromium's sandbox needs unprivileged user namespaces (linux-wolos has them); no setuid helper.
+  install -Dm755 atlas.sh "$pkgdir/usr/bin/atlas"
+  install -Dm644 atlas.desktop "$pkgdir/usr/share/applications/atlas.desktop"
+  install -Dm644 "$_dir/product_logo_256.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/atlas.png"
+  install -Dm644 "$_dir/product_logo_256.png" "$pkgdir/usr/share/pixmaps/atlas.png"
+  # First-run preferences are read next to the executable: wolos-system ships the file.
+  ln -s /usr/share/atlas/initial_preferences "$pkgdir/opt/atlas/initial_preferences"
+  # The licence texts the artifact carries.
+  for l in LICENSE LICENSE.ungoogled_chromium THIRD-PARTY.md; do
+    [[ -f $_dir/$l ]] && install -Dm644 "$_dir/$l" "$pkgdir/usr/share/licenses/$pkgbase/$l"
+  done
+  return 0
+}
+
+package_atlas-browser-locales() {
+  pkgdesc='Atlas, the WolOS web browser: the other interface languages'
+  depends=("atlas-browser=${pkgver}-${pkgrel}")
+  local _dir p l keep
+  _dir=$(_tree)
+  install -d "$pkgdir/opt/atlas/locales"
+  for p in "$_dir"/locales/*.pak; do
+    l=${p##*/}; l=${l%.pak}
+    keep=0
+    case " ${_main_locales[*]} " in *" $l "*) keep=1 ;; esac
+    [[ $keep = 1 ]] || install -m644 "$p" "$pkgdir/opt/atlas/locales/$l.pak"
+  done
+}
