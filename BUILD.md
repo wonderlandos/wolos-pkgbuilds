@@ -18,6 +18,10 @@ git clone https://github.com/wonderlandos/wolos-build ../wolos-build    # privat
 tools/lint.sh && cargo test --manifest-path checks/Cargo.toml            # before a pull request
 ```
 
+CPU-level flavour (docs/modules/x86-64-v3.md in wolos): `wolos-build pkg --march v3 [NAME...]` builds the
+same recipes with `-march=x86-64-v3` and Rust's `target-cpu` as `x86_64_v3` packages into `out-v3`; the
+recipes it leaves alone are in `march.skip` (the kernel has its own `-v3` package).
+
 Per-package hooks, both optional: `prebuild.sh DEPS_DIR WORK_DIR` runs on the build host before
 the chroot build (wolos-base writes its `base.manifest`), `build.conf` sets `makepkg_args`
 (wolos-base: `--nodeps`).

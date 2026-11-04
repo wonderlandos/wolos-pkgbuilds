@@ -1,0 +1,10 @@
+# Recipes that `wolos-build pkg --march v3|v4` does not rebuild (docs/modules/x86-64-v3.md in wolos): one
+# name per line, the reason after #. Recipes with arch=(any) are skipped by themselves (the same
+# bytes), so they are not listed.
+linux-wolos          # has its own -v3 package (linux-wolos-v3: _march=v3 in build.conf, the installer picks it)
+linux-wolos-v3       # same recipe, same reason
+scx-wolos            # BPF built against the generic kernel's BTF; the kernel flavour decides
+atlas-browser        # a repack of a signed, prebuilt artifact: nothing here compiles
+wolos-base           # a manifest of other packages: nothing here compiles
+wolos-hue            # Crystal: makepkg's flags do not reach LLVM, a v3 build is the baseline bytes (--mcpu is a recipe change, measured 0% on the 50 MP picture)
+wolos-shim           # runs before the OS, on any CPU the firmware boots: never above the baseline
