@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-ime (ADR 0032, wolos docs/modules/modules.md): the "Input methods" optional module, to
+# type the languages Setup offers beyond the keyboard layouts: Japanese (Mozc), Chinese (Pinyin and
+# more, chinese-addons), Korean (Hangul), with fcitx5's GTK and Qt modules and its settings tool.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/ime.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package; nothing outside Arch is a dependency. User side (`wol modules enable ime`): the session
+# starts fcitx5 and sets XMODIFIERS/QT_IM_MODULE (wolos side, not this package).
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-ime
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Input methods module: fcitx5 with Japanese (Mozc), Chinese and Korean (Hangul) input'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system fcitx5 fcitx5-gtk fcitx5-qt fcitx5-configtool fcitx5-mozc fcitx5-chinese-addons
+  fcitx5-hangul)
+
+package() {
+  # Nothing to install: the dependencies are the module.
+  :
+}

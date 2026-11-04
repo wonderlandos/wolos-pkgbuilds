@@ -17,3 +17,4 @@ tools/bump-wolos.sh
 tools/lint.sh
 wolos-base/base-manifest.sh
 wolos-base/prebuild.sh
+wolos-system/nsswitch-mdns.sh

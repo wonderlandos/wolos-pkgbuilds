@@ -3,6 +3,8 @@
 # bump-kernel.sh TAG: point linux-wolos and linux-wolos-api-headers at the fork's release tag
 # wolkernel-<wolkernel>-<linux> (github.com/wonderlandos/linux): linux-wolos/VERSION, the headers'
 # _wk/_linux, and the sha256 of GitHub's tag tarball in both recipes (their first sha256sums entry).
+# scx-wolos reads the same tarball (sched_ext headers): its _wk/_linux and checksum move too, and its
+# pkgrel goes +1 (its pkgver is the WolOS release, not the kernel's).
 # pkgrel goes to 1 on a new version, else +1 (the same version re-tagged). PKGREL=N sets it instead
 # (both recipes), e.g. to supersede an already published release of the same version.
 set -euo pipefail
@@ -31,3 +33,8 @@ for p in linux-wolos/PKGBUILD linux-wolos-api-headers/PKGBUILD; do
   grep -q "^sha256sums=('$sum'" "$p" || { echo "bump-kernel: $p: no sha256sums=('...' line to fill" >&2; exit 1; }
   echo "$p: $wk+$lx-$rel ($tag, sha256 $sum)"
 done
+p=scx-wolos/PKGBUILD rel=$(sed -n 's/^pkgrel=//p' scx-wolos/PKGBUILD)
+sed -i -E -e "s/^_wk=.*/_wk=$wk/" -e "s/^_linux=.*/_linux=$lx/" -e "s/^pkgrel=.*/pkgrel=$((rel + 1))/" \
+  -e "s/^sha256sums=\('[^']*'/sha256sums=('$sum'/" "$p"
+grep -q "^sha256sums=('$sum'" "$p" || { echo "bump-kernel: $p: no sha256sums=('...' line to fill" >&2; exit 1; }
+echo "$p: pkgrel $((rel + 1)) ($tag, sha256 $sum)"

@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# wolos-module-scanner (ADR 0032, wolos docs/modules/modules.md): the "Scanners" optional module:
+# SANE with its backends, driverless network and USB scanners (sane-airscan: eSCL and WSD; ipp-usb:
+# IPP over USB for the same scanners on a cable) and Document Scanner to scan.
+# A meta package: depends= is wolos-system plus the `packages` of its registry record
+# (/usr/share/wolos/modules/scanner.json, shipped by wolos-system so the module is listed before it is
+# installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
+# package; nothing outside Arch is a dependency. User side (`wol modules enable scanner`): nothing;
+# avahi (in the image) finds the network scanners, ipp-usb starts from udev.
+# Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
+pkgname=wolos-module-scanner
+pkgver=0.12.0
+pkgrel=1
+pkgdesc='WolOS Scanners module: SANE and its backends, driverless scanners (eSCL, WSD, IPP over USB), Document Scanner'
+arch=(any)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-or-later)
+depends=(wolos-system sane sane-airscan ipp-usb simple-scan)
+
+package() {
+  # Nothing to install: the dependencies are the module.
+  :
+}

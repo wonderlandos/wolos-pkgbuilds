@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# scx-wolos: scx_wolos, the WolOS QoS scheduler on sched_ext (wolos kernel/scx_wolos, GPL-2.0-only):
+# the BPF scheduler with its loader in /usr/bin/scx_wolos and scx_wolos.service, on by default
+# (60-scx-wolos.preset; the unit runs only where /sys/kernel/sched_ext/state exists, and EEVDF takes
+# over whenever it is not attached). linux-wolos builds CONFIG_SCHED_CLASS_EXT=y.
+# Built against the kernel it runs on: the sched_ext headers come from the fork's tag tarball (the
+# same file and checksum as linux-wolos; tools/bump-kernel.sh moves all three), the BTF from the
+# linux-wolos package's own vmlinuz (scripts/extract-vmlinux of that tarball), so the build needs no
+# running WolKernel and no headers package.
+pkgname=scx-wolos
+pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
+pkgdesc='WolOS QoS scheduler (sched_ext): interactive, foreground, default, utility and background classes'
+arch=(x86_64)
+url='https://github.com/wonderlandos/wolos'
+license=(GPL-2.0-only)
+depends=(glibc libbpf)
+makedepends=(clang bpf git linux-wolos zstd xz)
+options=(!debug !lto)
+install=scx-wolos.install
+# Version of the kernel tag: linux-wolos/VERSION (lint.sh checks they agree).
+_wk=1.0
+_linux=7.3
+_tag=wolkernel-$_wk-$_linux
+# The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
+_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+source=("linux-$_tag.tar.gz::https://github.com/wonderlandos/linux/archive/refs/tags/$_tag.tar.gz"
+  "wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
+  60-scx-wolos.preset)
+sha256sums=('5c0880774f3c928a4d9e344a8cb309069f5d049d7a60333f99a2f54450a023fd'
+            SKIP
+            'babdfb5dd39714f4e23175195dbc2b8382715b8327a044cf9922ae27ef4ae8d4')
+
+prepare() {
+  # The BTF of the installed linux-wolos (the makedepend): its vmlinuz, decompressed.
+  local _z
+  _z=$(find /usr/lib/modules -mindepth 2 -maxdepth 2 -name vmlinuz -path '*wolos*' | sort | tail -n1)
+  [ -n "$_z" ] || { echo "scx-wolos: no linux-wolos vmlinuz under /usr/lib/modules" >&2; return 1; }
+  sh "$srcdir/linux-$_tag/scripts/extract-vmlinux" "$_z" > "$srcdir/vmlinux"
+  echo "scx-wolos: BTF from $_z"
+}
+
+build() {
+  make -C "$srcdir/wolos/kernel/scx_wolos" KSRC="$srcdir/linux-$_tag" VMLINUX_BTF="$srcdir/vmlinux" \
+    CFLAGS="$CFLAGS $LDFLAGS -Wall"   # one compile-and-link line: Arch's hardening flags reach the link
+}
+
+check() {
+  make -C "$srcdir/wolos/kernel/scx_wolos" test
+}
+
+package() {
+  make -C "$srcdir/wolos/kernel/scx_wolos" KSRC="$srcdir/linux-$_tag" VMLINUX_BTF="$srcdir/vmlinux" \
+    DESTDIR="$pkgdir" install
+  install -Dm644 "$srcdir/60-scx-wolos.preset" "$pkgdir/usr/lib/systemd/system-preset/60-scx-wolos.preset"
+  install -Dm644 "$srcdir/wolos/kernel/scx_wolos/INTERFACE.md" "$pkgdir/usr/share/doc/$pkgname/INTERFACE.md"
+}

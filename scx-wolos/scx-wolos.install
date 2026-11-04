@@ -1,0 +1,11 @@
+post_install() {
+  systemctl preset scx_wolos.service >/dev/null 2>&1 || :
+  # No running systemd in the installer's chroot or the image build: start only on a live system.
+  if [ -d /run/systemd/system ]; then systemctl start scx_wolos.service >/dev/null 2>&1 || :; fi
+}
+post_upgrade() {
+  if [ -d /run/systemd/system ]; then systemctl try-restart scx_wolos.service >/dev/null 2>&1 || :; fi
+}
+pre_remove() {
+  systemctl disable --now scx_wolos.service >/dev/null 2>&1 || :
+}

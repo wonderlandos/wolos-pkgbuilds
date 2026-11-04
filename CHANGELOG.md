@@ -4,7 +4,19 @@ The user-facing changes of a WolOS release are in the wolos repository's `CHANGE
 lists what changed in the recipes, their checks and their workflows. The four repositories are
 tagged together (wolos ADR 0029).
 
-## 0.12.0 (unreleased)
+## 0.13.0 (unreleased)
+
+Recipes
+- `rsh` 0.1.3: Ruby with a shell layer (wolos ADR 0041), built from the tagged release tarball with `make test` (unit, golden, contract, interactive and sanitizer runs) in `check()`. Against the upstream package text: `ruby-rake` is a make dependency (mruby's `minirake` runs `rake`), `procps-ng` a check dependency (a golden test counts zombies with `ps`), and the interactive completion check uses `/etc/os-release` instead of `/etc/hostname`, which a clean build chroot does not have.
+- `scx-wolos`: the `scx_wolos` QoS scheduler on sched_ext (wolos `kernel/scx_wolos`) with `scx_wolos.service`, on by default through its preset. Built against the kernel it runs on: sched_ext headers from the WolKernel tag tarball (`tools/bump-kernel.sh` moves its checksum too), BTF from the `linux-wolos` package's `vmlinuz`.
+- `wolos-system` installs `/usr/share/wolos/plugins.schema.json` (ADR 0031), loads `ntsync` at boot, adds the CJK, Arabic and Hebrew font fallbacks (`/etc/fonts/conf.d/70-wolos-cjk-arabic.conf`), turns on power-profiles-daemon and keeps the fwupd metadata download off (`51-wolos-image.preset`), and puts `mdns_minimal` before `resolve` in `/etc/nsswitch.conf` on install and upgrade, so `.local` names resolve through avahi.
+- `wolos-module-dev` depends on `rubocop` (the linter `wol script check` runs on Ruby scripts).
+- New optional modules `wolos-module-ime` (fcitx5 with Mozc, Chinese and Hangul) and `wolos-module-scanner` (SANE, sane-airscan, ipp-usb, Document Scanner); their registry records come with wolos.
+
+Checks
+- `checks/tests/image_promises.rs`: the packages and image defaults the code runs (ruby, rsh, scx-wolos, power-profiles-daemon, fwupd, the CJK fonts, nss-mdns, the gvfs backends) are in the image lists and their recipes, and the nsswitch edit is idempotent.
+
+## 0.12.0
 
 Recipes
 - `linux-wolos` 1:1.0+7.3-5 (pkgrel 5) rebuilds the same fork tag `wolkernel-1.0-7.3` (sha256 unchanged); `linux-wolos-api-headers` stays at -4.

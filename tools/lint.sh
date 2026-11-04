@@ -4,7 +4,7 @@
 # - every package line names a directory with a PKGBUILD, and every LOCAL-DEP is an earlier line;
 # - a recipe reads only its own directory and its sources (no $startdir/.., no sibling checkout);
 # - the recipes built from wolos pin one and the same _wolos_commit;
-# - linux-wolos-api-headers has linux-wolos's VERSION;
+# - linux-wolos-api-headers and scx-wolos have linux-wolos's VERSION;
 # - helium-browser keeps the paths wolos's Helium theme writes (crates/core/src/theme/helium.rs);
 # - every PKGBUILD is shellcheck-clean as bash at error level (wolos/docs/STANDARDS.md §4; namcap
 #   needs an Arch host, shellcheck runs anywhere; skipped with a note when shellcheck is missing);
@@ -80,8 +80,10 @@ done
 commits=$(grep -h '^_wolos_commit=' */PKGBUILD | sort -u)
 [ "$(printf '%s\n' "$commits" | grep -c .)" -le 1 ] || bad "different _wolos_commit pins: $commits"
 wk=$(sed -n 's/^wolkernel=//p' linux-wolos/VERSION); lx=$(sed -n 's/^linux=//p' linux-wolos/VERSION)
-grep -qx "_wk=$wk" linux-wolos-api-headers/PKGBUILD && grep -qx "_linux=$lx" linux-wolos-api-headers/PKGBUILD ||
-  bad "linux-wolos-api-headers: _wk/_linux differ from linux-wolos/VERSION ($wk, $lx)"
+for p in linux-wolos-api-headers scx-wolos; do
+  grep -qx "_wk=$wk" $p/PKGBUILD && grep -qx "_linux=$lx" $p/PKGBUILD ||
+    bad "$p: _wk/_linux differ from linux-wolos/VERSION ($wk, $lx)"
+done
 for want in /opt/helium/initial_preferences /usr/bin/helium; do
   grep -qF "$want" helium-browser/PKGBUILD || bad "helium-browser lacks $want"
 done

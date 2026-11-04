@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgrel=3
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -30,10 +30,18 @@ _wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=6c6d2c0511b8d1427d81929d537113e71e7be737
 _shell_commit=b72d6806e8939ceb218ec0190707a381515a22a4
+# Image defaults the code relies on, kept here until wolos files/ carries them (same install paths):
+# ntsync at boot (Games Doctor), the CJK/Arabic/Hebrew font fallbacks (language picker, terminal),
+# power-profiles-daemon on (Energy Mode), .local names through nss-mdns (Printers, AirPlay, sharing).
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
   "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
-  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")
-sha256sums=(SKIP SKIP SKIP)
+  "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit"
+  ntsync.conf 70-wolos-cjk-arabic.conf 51-wolos-image.preset nsswitch-mdns.sh)
+sha256sums=(SKIP SKIP SKIP
+            '35472b5aa171de5251b78f19df9940d62c15fe533f5d5873151daf2713a1d6ca'
+            '0f3d50026713eefc2a05cb43d5a114de1bd6a858f1cd358a8c476de389e7040f'
+            '500e3b21ef6b3d16352f55afaf52d68c8d5613869de05c53860ef727b37592d8'
+            'e92161b6ce50b2e3540f0118e3ba35b95a0de73a3f7d3049e20eaf1405946704')
 
 prepare() {
   cd "$srcdir/wolos"
@@ -61,6 +69,12 @@ package() {
   (cd "$_repo/desktop/overlay" && tar --exclude ./usr/local -cf - .) | tar -C "$pkgdir" --no-same-owner -xf -
   (cd "$_repo/files" && cp -a --no-preserve=ownership . "$pkgdir/")
   rm "$pkgdir/usr/share/wolos/os-release"   # wolos-base owns it
+  # The plugin manifest schema where crates/shared/src/plugins.rs SCHEMA_PATH and ADR 0031 say it is.
+  install -Dm644 "$_repo/docs/plugins/plugin.schema.json" "$pkgdir/usr/share/wolos/plugins.schema.json"
+  install -Dm644 "$srcdir/ntsync.conf" "$pkgdir/usr/lib/modules-load.d/ntsync.conf"
+  install -Dm644 "$srcdir/70-wolos-cjk-arabic.conf" "$pkgdir/etc/fonts/conf.d/70-wolos-cjk-arabic.conf"
+  install -Dm644 "$srcdir/51-wolos-image.preset" "$pkgdir/usr/lib/systemd/system-preset/51-wolos-image.preset"
+  install -Dm755 "$srcdir/nsswitch-mdns.sh" "$pkgdir/usr/lib/wolos/nsswitch-mdns"
   local d=$_repo/design
   [ ! -d "$d/icons" ] || sh "$d/icons/install.sh" "$pkgdir/usr/share/icons/WolOS"
   [ ! -d "$d/wallpapers" ] || { install -d "$pkgdir/usr/share/wolos/wallpapers"; cp -R "$d/wallpapers/." "$pkgdir/usr/share/wolos/wallpapers/"; }

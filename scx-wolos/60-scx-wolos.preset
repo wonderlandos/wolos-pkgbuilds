@@ -1,0 +1,2 @@
+# WolOS QoS scheduler (scx-wolos): on wherever the kernel has sched_ext (the unit's condition).
+enable scx_wolos.service

@@ -1,0 +1,6 @@
+# WolOS (wolos-pkgbuilds/wolos-system): Arch units the image ships for code that reads them.
+# Energy Mode, Low/High Power Mode, `wol power apply` (wol_core::power::policy: powerprofilesctl).
+enable power-profiles-daemon.service
+# Firmware updates (fwupd, D-Bus activated): the metadata download stays off until the person turns
+# it on; it fetches third-party data (as wolos-clam-update.timer).
+disable fwupd-refresh.timer
