@@ -3,8 +3,8 @@
 # binaries (tools/build-rust.sh), Hyprland plugins (desktop/hyprland/build-plugins.sh), desktop/overlay,
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
-pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=7
+pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
+pkgrel=1
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -29,10 +29,10 @@ backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login
   etc/profile.d/wolos-console.sh etc/profile.d/wolos-ime.sh)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
-_wolos_commit=3718521124ceea8e4cc6c6093720f4f61e42eb8c
+_wolos_commit=c04d276d7140c7e0122b34ed16c3e55b52e0f013
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
-_brand_commit=fac7357bbbf80499601abfc561dc245c38d1800b
-_shell_commit=106af1b8e7291e5f2574372e37090da3f38e7de3
+_brand_commit=63a1de4917acd7869e97a5c75491ec4a43445fdc
+_shell_commit=2d3a4e3ae29e959bf56f1227963a6c58628e24c2
 # Image defaults the code relies on, kept here until wolos files/ carries them (same install paths):
 # ntsync at boot (Games Doctor), the CJK/Arabic/Hebrew font fallbacks (language picker, terminal),
 # power-profiles-daemon on (Energy Mode), .local names through nss-mdns (Printers, AirPlay, sharing).
