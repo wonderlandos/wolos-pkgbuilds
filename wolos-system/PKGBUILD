@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=5
+pkgrel=6
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -44,7 +44,7 @@ sha256sums=(SKIP SKIP SKIP
             '35472b5aa171de5251b78f19df9940d62c15fe533f5d5873151daf2713a1d6ca'
             '0f3d50026713eefc2a05cb43d5a114de1bd6a858f1cd358a8c476de389e7040f'
             'a2282f713398cb840236024c880fde87790537e549deedc963880ac86c21753c'
-            'e92161b6ce50b2e3540f0118e3ba35b95a0de73a3f7d3049e20eaf1405946704')
+            '1f446be6204321bbb07ba48c2be2a3442f0d31c2109631d4aac8c5d7fe5ab50f')
 
 prepare() {
   cd "$srcdir/wolos"

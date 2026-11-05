@@ -198,28 +198,41 @@ fn wolos_system_ships_the_image_defaults() {
     );
 }
 
+/// IPv4-only mDNS (dry run 0.13.0, net-firewall-state): with `mdns_minimal` every lookup of a
+/// `.local` name that has no IPv6 address waited 5 s for avahi's AAAA answer, getaddrinfo
+/// (AF_UNSPEC, what apps call) included: 5.0 s against 0.01 s with `mdns4_minimal`. A computer
+/// installed with the old line gets the new one on the upgrade (the install hooks run the edit).
 #[test]
 fn nsswitch_edit_puts_mdns_before_resolve_once() {
     let d = std::env::temp_dir().join(format!("nsswitch-{}", std::process::id()));
     fs::create_dir_all(&d).unwrap();
     let f = d.join("nsswitch.conf");
-    // Arch's filesystem package line at the snapshot.
-    fs::write(
-        &f,
+    let want = "passwd: files systemd\nhosts: mymachines mdns4_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns\n";
+    // Arch's filesystem package line at the snapshot, then the line WolOS 0.12 wrote.
+    for start in [
         "passwd: files systemd\nhosts: mymachines resolve [!UNAVAIL=return] files myhostname dns\n",
-    )
-    .unwrap();
-    for _ in 0..2 {
-        let o = Command::new("sh")
-            .arg(repo("wolos-system/nsswitch-mdns.sh"))
-            .arg(&f)
-            .output()
-            .unwrap();
-        assert!(o.status.success(), "{o:?}");
+        "passwd: files systemd\nhosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns\n",
+    ] {
+        fs::write(&f, start).unwrap();
+        for _ in 0..2 {
+            let o = Command::new("sh")
+                .arg(repo("wolos-system/nsswitch-mdns.sh"))
+                .arg(&f)
+                .output()
+                .unwrap();
+            assert!(o.status.success(), "{o:?}");
+        }
+        assert_eq!(fs::read_to_string(&f).unwrap(), want, "from: {start}");
     }
-    assert_eq!(
-        fs::read_to_string(&f).unwrap(),
-        "passwd: files systemd\nhosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns\n"
-    );
+    // A person's own mDNS choice (mdns, mdns6_minimal, mdns4_minimal) is left alone.
+    let own = "hosts: files mdns [NOTFOUND=return] dns\n";
+    fs::write(&f, own).unwrap();
+    let o = Command::new("sh")
+        .arg(repo("wolos-system/nsswitch-mdns.sh"))
+        .arg(&f)
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{o:?}");
+    assert_eq!(fs::read_to_string(&f).unwrap(), own);
     fs::remove_dir_all(&d).ok();
 }
