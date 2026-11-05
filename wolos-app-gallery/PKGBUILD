@@ -15,7 +15,7 @@ license=(BSD-2-Clause)
 # gives the SHA-256 that names cached thumbnails.
 depends=(gc pcre2 openssl zlib gcc-libs glibc libwolkit libwol)
 optdepends=('wolos-system: the WolOS icon theme the launcher entry names')
-makedepends=(crystal git)
+makedepends=(crystal>=1.22.0 git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). No submodule is needed: the
 # app and both shards are plain Crystal source in the main tree.

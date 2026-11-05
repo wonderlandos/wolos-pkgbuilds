@@ -102,6 +102,22 @@ fn files_offers_the_full_check_and_the_action_can_only_start_wol_analyze() {
     assert!(!c.contains("malware-signatures"));
 }
 
+/// E2E-SHARE (ADR 0059, S01): Files gets a "Share…" item from a second extension that starts
+/// `wol-share` with the file's path; the same makedepends (nautilus) build it, and the program is
+/// one of the binaries the build installs.
+#[test]
+fn files_offers_share_and_the_extension_is_built_with_wol_share() {
+    let root = siblings::root();
+    let read = |p: &str| std::fs::read_to_string(root.join(p)).unwrap();
+    let c = read("desktop/nautilus/wolos-share.c");
+    assert!(c.contains("#define MENU_LABEL \"Share…\""));
+    assert!(c.contains("\"wol-share\""));
+    let rust = read("tools/build-rust.sh");
+    assert!(rust.contains(" wol-share"));
+    assert!(rust.contains("nautilus/wolos-share.c"));
+    assert!(rust.contains("libwolos-share.so"));
+}
+
 /// A9 follow-up: every login-shell profile wolos-system ships in /etc/profile.d (the console
 /// prompt, the IME session exports) is in its backup=, so a local edit survives an upgrade and
 /// pacman leaves a .pacnew instead of overwriting it.

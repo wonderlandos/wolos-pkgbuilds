@@ -14,7 +14,7 @@ url='https://github.com/wonderlandos/wolos'
 # "cryswol/realtime") are GPL-2.0-or-later.
 license=(BSD-2-Clause GPL-2.0-or-later)
 # Apps built with the shard link libwol.
-depends=(crystal libwol)
+depends=(crystal>=1.22.0 libwol)
 optdepends=('wopkg: libwopkg.so.1 for require "cryswol/pkg"')
 makedepends=(git)
 options=(!debug)

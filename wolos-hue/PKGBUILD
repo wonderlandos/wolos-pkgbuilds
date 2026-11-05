@@ -11,7 +11,7 @@ url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later MIT)
 depends=(gc pcre2 libyaml openssl gcc-libs glibc glib2 gdk-pixbuf2)
 optdepends=('webp-pixbuf-loader: WebP pictures' 'libavif: AVIF pictures' 'wolos-system: wol theme set, to switch to the new theme')
-makedepends=(crystal git)
+makedepends=(crystal>=1.22.0 git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
 _wolos_commit=88702475bef751c0978d5e97d5758c803bf570e3

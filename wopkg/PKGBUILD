@@ -11,7 +11,7 @@ url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(gc pcre2 openssl zlib gcc-libs glibc bubblewrap git gnupg libarchive)
 optdepends=('flatpak: Flatpak apps' 'base-devel: building AUR packages' 'wolos-system: malware check of third-party downloads' 'strace: system-call trace of AUR builds')
-makedepends=(cargo crystal git)
+makedepends=(cargo crystal>=1.22.0 git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
 _wolos_commit=88702475bef751c0978d5e97d5758c803bf570e3
