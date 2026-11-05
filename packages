@@ -14,11 +14,11 @@ flatpak-wolos  flatpak-wolos        -                                       flat
 atlas-browser  atlas-browser        -                                       atlas-browser/
 wolos-mirrorlist wolos-mirrorlist   -                                       wolos-mirrorlist/ snapshot
 wolos-system   wolos-system         hyprland-wolos                          wolos-system/
-wolos-webapps wolos-webapps      wolos-system                            wolos-webapps/
 wopkg          wopkg                -                                       wopkg/
 libwol         libwol               -                                       libwol/
 libwolkit      libwolkit            -                                       libwolkit/
 webengine-wolos webengine-wolos     -                                       webengine-wolos/
+wolos-webapps  wolos-webapps        wolos-system,hyprland-wolos,webengine-wolos wolos-webapps/
 cryswol        cryswol              libwol                                  cryswol/
 wolkit         wolkit               libwolkit,libwol,cryswol                wolkit/
 wolos-hue      wolos-hue            -                                       wolos-hue/
