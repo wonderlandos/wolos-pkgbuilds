@@ -5,7 +5,7 @@
 # crates/wol-abi/abi/wol.map (link.sh), the soname is the ABI major.
 pkgname=libwol
 pkgver=1.16.0  # WOL_VERSION_MAJOR.MINOR.PATCH of crates/wol-abi/include/wol.h at _wolos_commit
-pkgrel=3
+pkgrel=4
 pkgdesc='WolOS app API: libwol.so.1 and wol.h, the stable C ABI apps in every language link'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -18,7 +18,7 @@ makedepends=(cargo git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules
 # (cargo reads every workspace member, crates/shell included).
-_wolos_commit=c04d276d7140c7e0122b34ed16c3e55b52e0f013
+_wolos_commit=8697ec4d6151f2b2a81c5f486d5c7a97871b1f94
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=63a1de4917acd7869e97a5c75491ec4a43445fdc
 _shell_commit=2d3a4e3ae29e959bf56f1227963a6c58628e24c2

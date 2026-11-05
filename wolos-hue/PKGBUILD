@@ -4,7 +4,7 @@
 # the parts translated from MIT code carry their notice, installed as THIRD-PARTY.md.
 pkgname=wolos-hue
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS theme from a picture: palette engine, sliders, Base16 and colors.toml import'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -14,7 +14,7 @@ optdepends=('webp-pixbuf-loader: WebP pictures' 'libavif: AVIF pictures' 'wolos-
 makedepends=('crystal>=1.22.0' git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
-_wolos_commit=c04d276d7140c7e0122b34ed16c3e55b52e0f013
+_wolos_commit=8697ec4d6151f2b2a81c5f486d5c7a97871b1f94
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 

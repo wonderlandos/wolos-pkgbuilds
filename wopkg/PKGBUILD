@@ -4,7 +4,7 @@
 # official recipes ship with it.
 pkgname=wopkg
 pkgver=0.1.0  # wopkg/shard.yml at _wolos_commit
-pkgrel=14
+pkgrel=15
 pkgdesc='WolOS package tool: pacman repos, Flatpak, AppImage, recipes and community packages in one command'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -14,7 +14,7 @@ optdepends=('flatpak: Flatpak apps' 'base-devel: building AUR packages' 'wolos-s
 makedepends=(cargo 'crystal>=1.22.0' git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
-_wolos_commit=c04d276d7140c7e0122b34ed16c3e55b52e0f013
+_wolos_commit=8697ec4d6151f2b2a81c5f486d5c7a97871b1f94
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=63a1de4917acd7869e97a5c75491ec4a43445fdc
 _shell_commit=2d3a4e3ae29e959bf56f1227963a6c58628e24c2

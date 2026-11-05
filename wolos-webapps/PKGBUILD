@@ -7,7 +7,7 @@
 # list from webapps/SHIPPED; the entries are the generated webapps/launchers/*.desktop.
 pkgname=wolos-webapps
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS system web apps: Doctor and the kit they share'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
@@ -19,7 +19,7 @@ options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). This recipe builds only
 # after the next bump: the pin must be a commit that has tools/install-webapps.sh, webapps/SHIPPED and
 # webapps/launchers/ (checks/tests/recipe_wolos_webapps.rs fails until it is).
-_wolos_commit=c04d276d7140c7e0122b34ed16c3e55b52e0f013
+_wolos_commit=8697ec4d6151f2b2a81c5f486d5c7a97871b1f94
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 
