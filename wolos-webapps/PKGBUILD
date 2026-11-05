@@ -7,7 +7,7 @@
 # list from webapps/SHIPPED; the entries are the generated webapps/launchers/*.desktop.
 pkgname=wolos-webapps
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=4
+pkgrel=5
 pkgdesc='WolOS system web apps: Doctor and the kit they share'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
@@ -20,8 +20,8 @@ options=(!debug !lto)
 # webapps/launchers/ (checks/tests/recipe_wolos_webapps.rs fails until it is).
 # The source is GitHub's archive of that commit, not a git clone: the recipe builds --nodeps
 # (build.conf), so the chroot has no git; bump-wolos.sh moves the commit and its sha256 together.
-_wolos_commit=551b5fded1e47ffc7728ca491190d34cae351bc2
-_wolos_archive_sha256=1a6c4d2bf8cf929f6b932027a557023f681a176931fcea22aea7ebf3b2a93ae6
+_wolos_commit=4258a7eec9996e91ec1488854210a9feff0ecc1c
+_wolos_archive_sha256=2bebb3f140d979c24c8eb5d8e87db01d3c000474abaa9794c46596e627af1430
 source=("wolos-$_wolos_commit.tar.gz::https://github.com/wonderlandos/wolos/archive/$_wolos_commit.tar.gz")
 sha256sums=("$_wolos_archive_sha256")
 
