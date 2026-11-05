@@ -30,7 +30,8 @@ fn array_has(text: &str, name: &str, want: &str) -> bool {
         .find(|l| l.starts_with(&pre))
         .unwrap_or_else(|| panic!("PKGBUILD lacks {name}=("))
         .split(['(', ')', ' '])
-        .any(|w| w == want)
+        // 'crystal>=1.22.0' is the package crystal (RCR-046 pins the compiler's floor in the recipe)
+        .any(|w| w.trim_matches('\'').split(['<', '>', '=']).next() == Some(want))
 }
 
 /// The `packages` line of NAME, split on whitespace.

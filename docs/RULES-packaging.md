@@ -83,7 +83,7 @@ relaxed by adding an entry.
 - RP-051: recipe_firewall_files.rs and recipe_network_vpn.rs (NET-3) test files that read wolos-system through the
   overlaid tree and name no package directory of their own.
 
-- RP-055: the `etc/` files of the overlay that no person or Settings page writes (NetworkManager dispatcher, Chromium
+- RP-055: the `etc/` files of the overlay that no person or Settings page writes (NetworkManager dispatcher, Atlas, Chromium
   and Flatpak policy, fonts, the PAM stacks, the polkit-like job files, the GTK, Qt and portal defaults): an upgrade
   putting the shipped file back is the intent. A new file under `desktop/overlay/etc` that a person or a Settings
   page writes (the firewall rule files and the sudoers drop-in were the two that 0f05dc2 and 870c239 fixed) goes into

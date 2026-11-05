@@ -87,7 +87,16 @@ fn every_record_has_its_meta_package_and_the_same_dependencies() {
         assert_eq!(pkgvar(&dir, "arch"), ["any"], "{dir}: a meta package");
         let mut want = vec!["wolos-system".to_string()];
         want.extend(json_list(&rec, "packages"));
-        let mut got = pkgvar(&dir, "depends");
+        // A constraint ('crystal>=1.22.0', RCR-046) is not another package: compare the names.
+        let mut got: Vec<String> = pkgvar(&dir, "depends")
+            .into_iter()
+            .map(|d| {
+                d.split(['<', '>', '='])
+                    .next()
+                    .unwrap_or_default()
+                    .to_string()
+            })
+            .collect();
         assert_eq!(got.len(), {
             let mut u = got.clone();
             u.sort();
@@ -155,7 +164,16 @@ fn wolos_packages() -> Vec<String> {
 /// except Creative, which brings wol-hue (themes from a picture, wolos creative.json).
 #[test]
 fn dev_module_brings_the_crystal_runtime() {
-    let deps = pkgvar("wolos-module-dev", "depends");
+    // Names only: the recipe pins the compiler as 'crystal>=1.22.0' (RCR-046).
+    let deps: Vec<String> = pkgvar("wolos-module-dev", "depends")
+        .into_iter()
+        .map(|d| {
+            d.split(['<', '>', '='])
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
     // pkgconf: `crystal build` asks pkg-config for the libraries a shard links.
     for p in ["crystal", "pkgconf", "libwol", "cryswol", "wolkit"] {
         assert!(deps.iter().any(|d| d == p), "wolos-module-dev lacks {p}");
@@ -165,7 +183,15 @@ fn dev_module_brings_the_crystal_runtime() {
         assert!(ours.iter().any(|o| o == p), "{p} is not a [wolos] package");
     }
     // The shard's recipe still pulls the runtime it links.
-    let shard = pkgvar("cryswol", "depends");
+    let shard: Vec<String> = pkgvar("cryswol", "depends")
+        .into_iter()
+        .map(|d| {
+            d.split(['<', '>', '='])
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
     assert!(shard.iter().any(|d| d == "crystal") && shard.iter().any(|d| d == "libwol"));
     for id in ids() {
         let dir = format!("wolos-module-{id}");

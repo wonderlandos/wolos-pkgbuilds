@@ -4,8 +4,8 @@
 # shard (Crystal, ADR 0036), Swift and .NET. The exports and symbol versions come only from
 # crates/wol-abi/abi/wol.map (link.sh), the soname is the ABI major.
 pkgname=libwol
-pkgver=1.15.0  # WOL_VERSION_MAJOR.MINOR.PATCH of crates/wol-abi/include/wol.h at _wolos_commit
-pkgrel=2
+pkgver=1.16.0  # WOL_VERSION_MAJOR.MINOR.PATCH of crates/wol-abi/include/wol.h at _wolos_commit
+pkgrel=1
 pkgdesc='WolOS app API: libwol.so.1 and wol.h, the stable C ABI apps in every language link'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -18,10 +18,10 @@ makedepends=(cargo git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules
 # (cargo reads every workspace member, crates/shell included).
-_wolos_commit=88702475bef751c0978d5e97d5758c803bf570e3
+_wolos_commit=95fc996ad0b587b805ffe8d2a07e4964f86e26dd
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
-_brand_commit=097d2e6ae8bbdc579313914cd6ddda9348d7fe6d
-_shell_commit=1df996a17f2fee489fc89bba1c80cb63f64ff3fb
+_brand_commit=eada74b6bad5fc51140bfaf4db4d86d47b8cdaa9
+_shell_commit=cf8d1687204456f5dbaf282c994e8934bf85b34d
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
   "wolos-brand::git+https://github.com/wonderlandos/wolos-brand.git#commit=$_brand_commit"
   "wolos-shell::git+https://github.com/wonderlandos/wolos-shell.git#commit=$_shell_commit")

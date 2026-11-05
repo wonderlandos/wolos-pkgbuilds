@@ -41,7 +41,12 @@ fn the_package_installs_the_shard_with_its_own_make_install() {
     let depends = p.lines().find(|l| l.starts_with("depends=(")).unwrap();
     for d in ["crystal", "cryswol", "libwolkit", "libwol"] {
         assert!(
-            depends.split(['(', ')', ' ']).any(|w| w == d),
+            // 'crystal>=1.22.0' is the package crystal (RCR-046 pins the compiler's floor)
+            depends.split(['(', ')', ' ']).any(|w| w
+                .trim_matches('\'')
+                .split(['<', '>', '='])
+                .next()
+                == Some(d)),
             "{depends} lacks {d}"
         );
     }

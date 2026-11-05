@@ -5,7 +5,7 @@
 # tree (relative requires), so the build fetches nothing; libwolkit and libwol are linked from the
 # system.
 pkgname=wolos-app-gallery
-pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit
+pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit
 pkgrel=1
 pkgdesc='WolOS picture library and viewer: smart sections by date and place, zoom, slideshow'
 arch=(x86_64)
@@ -15,11 +15,11 @@ license=(BSD-2-Clause)
 # gives the SHA-256 that names cached thumbnails.
 depends=(gc pcre2 openssl zlib gcc-libs glibc libwolkit libwol)
 optdepends=('wolos-system: the WolOS icon theme the launcher entry names')
-makedepends=(crystal>=1.22.0 git)
+makedepends=('crystal>=1.22.0' git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). No submodule is needed: the
 # app and both shards are plain Crystal source in the main tree.
-_wolos_commit=11cd053405c386404b3d811d842fb82b361209ab
+_wolos_commit=95fc996ad0b587b805ffe8d2a07e4964f86e26dd
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 

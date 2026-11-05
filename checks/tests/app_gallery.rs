@@ -36,7 +36,7 @@ fn the_recipe_builds_checks_and_installs_the_app() {
         "\"$pkgdir/usr/share/applications/org.wolos.gallery.desktop\"",
         "\"$_app/org.wolos.gallery.consent.json\" \"$pkgdir/usr/share/wolos/consent.d/org.wolos.gallery.json\"",
         "\"$pkgdir/usr/share/licenses/$pkgname/LICENSE\"",
-        "pkgver=0.12.0  # the newest CHANGELOG.md entry at _wolos_commit",
+        "pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit",
     ] {
         assert!(p.contains(want), "{RECIPE} lacks {want}");
     }
@@ -45,11 +45,20 @@ fn the_recipe_builds_checks_and_installs_the_app() {
         assert!(words(depends).contains(&d), "{depends} lacks {d}");
     }
     let make = p.lines().find(|l| l.starts_with("makedepends=(")).unwrap();
-    assert!(words(make).contains(&"crystal"), "{make} lacks crystal");
+    // 'crystal>=1.22.0': the recipe pins the compiler's floor (RCR-046), the package is crystal
+    assert!(
+        words(make)
+            .iter()
+            .any(|w| w.trim_matches('\'').split(['<', '>', '=']).next() == Some("crystal")),
+        "{make} lacks crystal"
+    );
     let license = p.lines().find(|l| l.starts_with("license=(")).unwrap();
     assert_eq!(words(license), ["license=", "BSD-2-Clause"], "{license}");
     // Never fetch shards: the app has no dependencies and builds with crystal itself.
-    assert!(!p.contains("shards install") && !p.contains("shards build"), "{RECIPE} runs shards");
+    assert!(
+        !p.contains("shards install") && !p.contains("shards build"),
+        "{RECIPE} runs shards"
+    );
 }
 
 #[test]
@@ -62,7 +71,10 @@ fn gallery_is_a_line_of_packages_built_after_the_engine() {
     let w: Vec<&str> = line.split_whitespace().collect();
     assert_eq!(w[1], "wolos-app-gallery", "{line}");
     let deps: Vec<&str> = w[2].split(',').collect();
-    assert!(deps.contains(&"libwolkit") && deps.contains(&"libwol"), "{line}");
+    assert!(
+        deps.contains(&"libwolkit") && deps.contains(&"libwol"),
+        "{line}"
+    );
     assert_eq!(&w[3..], ["wolos-app-gallery/"], "{line}");
 }
 
@@ -86,7 +98,10 @@ fn the_app_has_what_the_recipe_installs_and_runs() {
         "StartupWMClass=org.wolos.gallery",
         "MimeType=image/jpeg;image/png;",
     ] {
-        assert!(desktop.lines().any(|l| l == want), "the desktop entry lacks {want}");
+        assert!(
+            desktop.lines().any(|l| l == want),
+            "the desktop entry lacks {want}"
+        );
     }
     // The default grants the package installs: exactly the two verbs the app uses, for its program.
     let consent = read(&format!("{APP}/org.wolos.gallery.consent.json"));
@@ -98,11 +113,17 @@ fn the_app_has_what_the_recipe_installs_and_runs() {
     }
     assert_eq!(consent.matches("capability").count(), 2, "{consent}");
     let main = read(&format!("{APP}/src/main.cr"));
-    assert!(main.contains("app_id: Gallery::APP_ID"), "{APP}/src/main.cr");
+    assert!(
+        main.contains("app_id: Gallery::APP_ID"),
+        "{APP}/src/main.cr"
+    );
     assert!(read(&format!("{APP}/src/gallery/dirs.cr")).contains("APP_ID = \"org.wolos.gallery\""));
     let shard = read(&format!("{APP}/shard.yml"));
     assert!(shard.contains("name: gallery") && shard.contains("license: BSD-2-Clause"));
-    assert!(!shard.contains("dependencies:"), "the app takes no shard dependency");
+    assert!(
+        !shard.contains("dependencies:"),
+        "the app takes no shard dependency"
+    );
     for f in [
         "spec/golden/library-date.png",
         "spec/golden/viewer.png",
@@ -112,7 +133,10 @@ fn the_app_has_what_the_recipe_installs_and_runs() {
         "DESIGN.md",
         "tools/styles.sh",
     ] {
-        assert!(siblings::root().join(APP).join(f).exists(), "{APP}/{f} is missing");
+        assert!(
+            siblings::root().join(APP).join(f).exists(),
+            "{APP}/{f} is missing"
+        );
     }
     assert!(siblings::root().join("LICENSES/BSD-2-Clause.txt").exists());
 }

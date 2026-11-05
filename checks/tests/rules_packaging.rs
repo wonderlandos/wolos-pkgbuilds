@@ -30,7 +30,12 @@ const BASELINE: &[(&str, &str)] = &[
     // RP-055: files of /etc that wolos-system ships and a person or Settings never writes; an
     // upgrade putting the shipped file back is the intent (policy), so they stay out of backup=.
     ("RP-055", "etc/NetworkManager/dispatcher.d/50-wolos-online"),
+    // ATLAS-WOLOS: the browser's managed and recommended policy files, and the legacy copies the engine
+    // reads until the fork carries its policy-path patch: written by the image, put back on upgrade.
+    ("RP-055", "etc/atlas/policies/managed/wolos.json"),
+    ("RP-055", "etc/atlas/policies/recommended/wolos.json"),
     ("RP-055", "etc/chromium/policies/managed/wolos.json"),
+    ("RP-055", "etc/chromium/policies/recommended/wolos.json"),
     ("RP-055", "etc/flatpak/remotes.d/flathub.flatpakrepo"),
     ("RP-055", "etc/fonts/conf.d/50-wolos-fonts.conf"),
     ("RP-055", "etc/fonts/conf.d/60-wolos-inter.conf"),
