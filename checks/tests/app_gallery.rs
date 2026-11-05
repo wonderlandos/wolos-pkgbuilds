@@ -36,7 +36,7 @@ fn the_recipe_builds_checks_and_installs_the_app() {
         "\"$pkgdir/usr/share/applications/org.wolos.gallery.desktop\"",
         "\"$_app/org.wolos.gallery.consent.json\" \"$pkgdir/usr/share/wolos/consent.d/org.wolos.gallery.json\"",
         "\"$pkgdir/usr/share/licenses/$pkgname/LICENSE\"",
-        "pkgver=0.12.1  # the newest CHANGELOG.md entry at _wolos_commit",
+        "pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit",
     ] {
         assert!(p.contains(want), "{RECIPE} lacks {want}");
     }
