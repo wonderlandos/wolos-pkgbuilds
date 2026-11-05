@@ -834,6 +834,7 @@ const BUMPED: &[&str] = &[
     "_brand_commit",
     "_shell_commit",
     "_os_release_sha256",
+    "_wolos_archive_sha256",
 ];
 
 #[test]

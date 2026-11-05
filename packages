@@ -18,7 +18,7 @@ wopkg          wopkg                -                                       wopk
 libwol         libwol               -                                       libwol/
 libwolkit      libwolkit            -                                       libwolkit/
 webengine-wolos webengine-wolos     -                                       webengine-wolos/
-wolos-webapps  wolos-webapps        wolos-system,hyprland-wolos,webengine-wolos wolos-webapps/
+wolos-webapps  wolos-webapps        wolos-system,webengine-wolos     wolos-webapps/
 cryswol        cryswol              libwol                                  cryswol/
 wolkit         wolkit               libwolkit,libwol,cryswol                wolkit/
 wolos-hue      wolos-hue            -                                       wolos-hue/

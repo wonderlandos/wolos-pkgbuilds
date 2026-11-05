@@ -14,17 +14,19 @@ url='https://github.com/wonderlandos/wolos'
 # The apps are GPL-2.0-or-later; the kit (webapps/kit) is BSD-2-Clause so any app may ship it.
 license=(GPL-2.0-or-later BSD-2-Clause)
 depends=(wolos-system webengine-wolos)
-makedepends=(git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). This recipe builds only
 # after the next bump: the pin must be a commit that has tools/install-webapps.sh, webapps/SHIPPED and
 # webapps/launchers/ (checks/tests/recipe_wolos_webapps.rs fails until it is).
+# The source is GitHub's archive of that commit, not a git clone: the recipe builds --nodeps
+# (build.conf), so the chroot has no git; bump-wolos.sh moves the commit and its sha256 together.
 _wolos_commit=d7b3176c937edc8ad75a92da45d968bbf29e1863
-source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
-sha256sums=(SKIP)
+_wolos_archive_sha256=a0621f13ac684123f7e66737624cd415cd5959d34d9c4c6f4d953b78837225cf
+source=("wolos-$_wolos_commit.tar.gz::https://github.com/wonderlandos/wolos/archive/$_wolos_commit.tar.gz")
+sha256sums=("$_wolos_archive_sha256")
 
 package() {
-  local _repo=$srcdir/wolos
+  local _repo=$srcdir/wolos-$_wolos_commit
   "$_repo/tools/install-webapps.sh" "$pkgdir"
   install -Dm644 "$_repo/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 "$_repo/LICENSES/BSD-2-Clause.txt" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-kit"

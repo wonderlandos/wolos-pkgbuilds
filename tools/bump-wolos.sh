@@ -5,6 +5,10 @@
 # (CHANGELOG.md's newest entry; wopkg: wopkg/shard.yml; libwol and libwolkit: the ABI version in
 # wol.h and wolkit.h; wolkit and cryswol: their shard.yml); pkgrel goes to 1 on a new pkgver, else +1.
 # WOLOS_CHECKOUT: a wolos clone that has SHA (default: a fresh shallow fetch). bump.yml opens the PR.
+# A recipe built from GitHub's archive of the commit (wolos-webapps: it builds --nodeps, no git in
+# the chroot) pins its sha256 in _wolos_archive_sha256=: the archive of SHA is downloaded once and
+# hashed (WOLOS_ARCHIVE_URL: the archive base, default GitHub's; tests use file://). A git+ source
+# stays SKIP (its #commit= pins it).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 sha=${1:?SHA}; src=${2:-}
@@ -29,6 +33,12 @@ ver_libwol=$(show crates/wol-abi/include/wol.h | awk '/^#define WOL_VERSION_(MAJ
 ver_libwolkit=$(show crates/wolkit/include/wolkit.h | awk '/^#define WOLKIT_VERSION_(MAJOR|MINOR|PATCH) / {v = v (v == "" ? "" : ".") $3} END {print v}')
 ver_wolkit=$(show wolos-crystal/shards/wolkit/shard.yml | sed -n 's/^version: //p')
 ver_cryswol=$(show wolos-crystal/shards/cryswol/shard.yml | sed -n 's/^version: //p')
+archive_sum=''
+archive_sha256() {
+  [ -n "$archive_sum" ] || archive_sum=$(curl -fsSL --retry 3 "${WOLOS_ARCHIVE_URL:-https://github.com/wonderlandos/wolos/archive}/$sha.tar.gz" | sha256sum | cut -d" " -f1)
+  [[ $archive_sum =~ ^[0-9a-f]{64}$ ]] || { echo "bump-wolos: no archive of $sha to hash" >&2; exit 1; }
+  echo "$archive_sum"
+}
 for p in $(grep -l '^_wolos_commit=' */PKGBUILD); do
   old=$(sed -n 's/^_wolos_commit=//p' "$p")
   [ "$old" != "$sha" ] || continue
@@ -56,6 +66,10 @@ for p in $(grep -l '^_wolos_commit=' */PKGBUILD); do
   # wolos-base takes os-release as one checksummed file of that commit.
   if grep -q "^_os_release_sha256=" "$p"; then
     sed -i "s/^_os_release_sha256=.*/_os_release_sha256=$(show files/usr/share/wolos/os-release | sha256sum | cut -d" " -f1)/" "$p"
+  fi
+  if grep -q "^_wolos_archive_sha256=" "$p"; then
+    archive_sha256 >/dev/null   # here, not in $(...) below: the sum is kept for the next recipe
+    sed -i "s/^_wolos_archive_sha256=.*/_wolos_archive_sha256=$archive_sum/" "$p"
   fi
   echo "$p: $old -> $sha ($(sed -n 's/^pkgver=\([^ ]*\).*/\1/p' "$p")-$(sed -n 's/^pkgrel=//p' "$p"))"
 done
