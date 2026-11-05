@@ -4,20 +4,21 @@
 # (/usr/share/wolos/modules/dev.json, shipped by wolos-system so the module is listed before it is
 # installed; checks/tests/modules.rs keeps the two equal). Everything is a snapshot-pinned Arch
 # package except the WolOS userland language runtime: crystal and pkgconf (Arch) plus libwol and
-# the cryswol shard (this repo's [wolos] packages), so `require "cryswol"` builds and runs on an
+# the cryswol and wolkit shards (this repo's [wolos] packages; wolkit also brings `wolkit-new` and the
+# app templates `wol app new` copies), so `require "cryswol"` builds and runs on an
 # installed system; nothing outside Arch or [wolos] is a dependency. User side (`wol modules enable dev`):
 # ~/Work and the rootless podman socket (/usr/lib/wolos/modules-enable-dev).
 # rubocop is the linter `wol script check` runs on Ruby scripts (wolos ADR 0041; ruby is in the image).
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-dev
 pkgver=0.12.0
-pkgrel=4
+pkgrel=5
 pkgdesc='WolOS Developer module: git, GitHub CLI, mise, Code - OSS, lazygit, btop, zellij, podman, RuboCop, Crystal and Cryswol'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(wolos-system git github-cli mise code lazygit btop zellij podman jq rubocop shellcheck
-  ttf-jetbrains-mono-nerd crystal pkgconf base-devel libwol cryswol)
+  ttf-jetbrains-mono-nerd crystal pkgconf base-devel libwol cryswol wolkit)
 
 package() {
   # Nothing to install: the dependencies are the module.
