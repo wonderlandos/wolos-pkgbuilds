@@ -7,7 +7,7 @@
 # changed nothing else in it. Exports and symbol versions come only from wolwebengine.map (link.sh).
 pkgname=webengine-wolos
 pkgver=0.12.1
-pkgrel=1
+pkgrel=2
 pkgdesc='WolOS web-app runtime engine: libwolwebengine.so.1 and wolwebengine.h (the Rust browser engine at a pinned commit)'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -33,9 +33,9 @@ _engine_rev=aac43a3f31a259f04a574f5ec4e959c943ad7cc7
 _mozjs=153.3.0-1
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules (cargo
 # reads every workspace member for check()).
-_wolos_commit=95fc996ad0b587b805ffe8d2a07e4964f86e26dd
-_brand_commit=eada74b6bad5fc51140bfaf4db4d86d47b8cdaa9
-_shell_commit=cf8d1687204456f5dbaf282c994e8934bf85b34d
+_wolos_commit=3718521124ceea8e4cc6c6093720f4f61e42eb8c
+_brand_commit=fac7357bbbf80499601abfc561dc245c38d1800b
+_shell_commit=106af1b8e7291e5f2574372e37090da3f38e7de3
 source=("servo-$_engine_rev.tar.gz::https://github.com/servo/servo/archive/$_engine_rev.tar.gz"
   "libmozjs-$_mozjs-x86_64-unknown-linux-gnu.tar.gz::https://github.com/servo/mozjs/releases/download/mozjs-sys-v$_mozjs/libmozjs-x86_64-unknown-linux-gnu.tar.gz"
   "wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
