@@ -72,6 +72,7 @@ relaxed by adding an entry.
 | RP-055 | every file wolos-system ships under `etc/` (the wolos tree's `desktop/overlay/etc`) is in backup=, or a baseline row says why an upgrade may put it back | origins (0.13) |
 | RP-056 | no `|| return 0` or `|| exit 0` in a recipe: a step whose input is absent fails loudly, it does not ship a package without it | origins (0.13) |
 | RP-057 | every `_wolos_commit`, `_brand_commit` and `_shell_commit` is a commit a remote branch or tag of the wolos checkout (`$WOLOS_SRC`, else `../wolos`) still contains: the builder fetches a pin by sha and a host serves only what a ref reaches (not checked without a checkout) | origins (0.13) |
+| RP-058 | the pkgver of every recipe that follows the wolos CHANGELOG (all built from `_wolos_commit` except wopkg, libwol, libwolkit, wolkit, cryswol, wolos-browser-config) is the first `## ` heading of CHANGELOG.md at that commit, which must be a numbered release (never `## Unreleased`), and newer than the newest `v*` release tag the commit descends from unless it is that tag: a head that ships under the last release's number is never offered to its computers (not checked without a wolos checkout) | origins (0.13), QA-A9-IMAGE-01 |
 
 ## Known violations (baseline)
 

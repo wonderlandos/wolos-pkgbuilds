@@ -65,14 +65,33 @@ fn recipe_replaces_the_previous_browser_and_keeps_the_theme_paths() {
     {
         assert!(r.contains(want), "PKGBUILD lacks: {want}");
     }
-    // The artifact comes from our own release and is signed by the key we pin.
+    // QA-A9-IMAGE-07: the artifact is the lane's, published on our own CDN, and the sha256 in the
+    // recipe pins it byte for byte. Nothing in the pipeline signs an Atlas artifact, so the recipe
+    // has no signature source and no validpgpkeys (it required an .asc nobody could produce).
     assert!(r.contains("url='https://github.com/wonderlandos/atlas'"));
-    assert!(r.contains("atlas-${pkgver}-x86_64_linux.tar.xz.asc"));
-    assert!(r.contains("validpgpkeys=('C3B6062A2BA6EEABC1DA0F5766C5F2B181374033')"));
     assert!(
-        repo()
-            .join("atlas-browser/keys/pgp/C3B6062A2BA6EEABC1DA0F5766C5F2B181374033.asc")
-            .is_file()
+        r.contains(
+            "source=(\"https://cdn.wolos.org/atlas/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz\""
+        ),
+        "the tarball comes from cdn.wolos.org/atlas/<pkgver>/ (the lane's upload)"
+    );
+    let code: Vec<&str> = r
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .collect();
+    for l in &code {
+        assert!(
+            !l.contains(".asc") && !l.contains(".sig") && !l.starts_with("validpgpkeys"),
+            "a signature source or validpgpkeys with no signer: {l}"
+        );
+    }
+    assert!(
+        !code.iter().any(|l| l.trim() == "SKIP"),
+        "every source is pinned by sha256, none is SKIP"
+    );
+    assert!(
+        !repo().join("atlas-browser/keys").exists(),
+        "no key of a signer that does not exist"
     );
     // The previous browser's names are gone from what ships.
     for f in ["atlas.sh", "atlas.desktop"] {
@@ -134,18 +153,13 @@ fn lint_fixture() -> PathBuf {
     let t = scratch("lint");
     fs::create_dir_all(t.join("tools")).unwrap();
     fs::copy(repo().join("tools/lint.sh"), t.join("tools/lint.sh")).unwrap();
-    let d = t.join("atlas-browser/keys/pgp");
-    fs::create_dir_all(&d).unwrap();
+    fs::create_dir_all(t.join("atlas-browser")).unwrap();
     for f in ["PKGBUILD", "atlas.sh", "atlas.desktop"] {
         fs::copy(
             repo().join("atlas-browser").join(f),
             t.join("atlas-browser").join(f),
         )
         .unwrap();
-    }
-    for e in fs::read_dir(repo().join("atlas-browser/keys/pgp")).unwrap() {
-        let e = e.unwrap();
-        fs::copy(e.path(), d.join(e.file_name())).unwrap();
     }
     t
 }
@@ -163,7 +177,7 @@ fn lint_atlas(t: &Path) -> (bool, String) {
 }
 
 #[test]
-fn lint_rejects_unsafe_defaults_and_a_missing_key() {
+fn lint_rejects_unsafe_defaults_and_a_signer_that_does_not_exist() {
     if !tools() {
         eprintln!("bash missing: lint rule not run");
         return;
@@ -219,10 +233,38 @@ fn lint_rejects_unsafe_defaults_and_a_missing_key() {
     assert!(!ok && err.contains("chromedriver"), "{err}");
     fs::write(t.join("atlas-browser/PKGBUILD"), &r).unwrap();
 
-    // The pinned key must be in the recipe directory.
-    fs::remove_dir_all(t.join("atlas-browser/keys")).unwrap();
+    // A signature source or a pinned signing key with no signer behind it is refused (the lane
+    // signs nothing: QA-A9-IMAGE-07); a SKIP checksum next to it is how it used to slip through.
+    fs::write(
+        t.join("atlas-browser/PKGBUILD"),
+        r.replace(
+            "x86_64_linux.tar.xz\"\n",
+            "x86_64_linux.tar.xz\"\n  \"https://cdn.wolos.org/atlas/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz.asc\"\n",
+        ),
+    )
+    .unwrap();
     let (ok, err) = lint_atlas(&t);
-    assert!(!ok && err.contains("keys/pgp"), "{err}");
+    assert!(!ok && err.contains("signature source"), "{err}");
+    fs::write(
+        t.join("atlas-browser/PKGBUILD"),
+        format!("{r}validpgpkeys=('C3B6062A2BA6EEABC1DA0F5766C5F2B181374033')\n"),
+    )
+    .unwrap();
+    let (ok, err) = lint_atlas(&t);
+    assert!(!ok && err.contains("validpgpkeys"), "{err}");
+    fs::write(t.join("atlas-browser/PKGBUILD"), &r).unwrap();
+    // A source that is not on the CDN path of the lane is refused too.
+    fs::write(
+        t.join("atlas-browser/PKGBUILD"),
+        r.replace(
+            "https://cdn.wolos.org/atlas/",
+            "https://github.com/wonderlandos/atlas/releases/download/",
+        ),
+    )
+    .unwrap();
+    let (ok, err) = lint_atlas(&t);
+    assert!(!ok && err.contains("cdn.wolos.org/atlas"), "{err}");
+    fs::write(t.join("atlas-browser/PKGBUILD"), &r).unwrap();
 
     // The old paths do not satisfy the rule.
     fs::write(

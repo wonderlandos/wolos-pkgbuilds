@@ -164,3 +164,91 @@ fn bump_snapshot_moves_every_copy() {
     assert!(read(&pb.join("wolos-mirrorlist/PKGBUILD")).contains("\npkgrel=1\n"));
     let _ = fs::remove_dir_all(&t);
 }
+
+/// `git -C wolos show sha:path` of the wolos checkout (`$WOLOS_SRC`, else `../../wolos`): None when
+/// there is no checkout or the commit/file is not in it.
+fn wolos_show(sha: &str, path: &str) -> Option<String> {
+    let w = std::env::var_os("WOLOS_SRC").map_or_else(|| here().join("../wolos"), PathBuf::from);
+    let o = Command::new("git")
+        .arg("-C")
+        .arg(w)
+        .args(["show", &format!("{sha}:{path}")])
+        .output()
+        .ok()?;
+    o.status
+        .success()
+        .then(|| String::from_utf8_lossy(&o.stdout).into_owned())
+}
+
+fn ver(v: &str) -> Vec<u64> {
+    v.split('.').filter_map(|p| p.parse().ok()).collect()
+}
+
+/// The verdict of [`snapshot_moves_with_the_release`] for one set of facts: `top` is the newest
+/// CHANGELOG release at the pin, `last` the last published release and `last_snap` the snapshot
+/// date it shipped on (wolos tools/release/last-release.txt).
+fn moves_with_release(top: &str, last: &str, last_snap: &str, snap: &str) -> Result<(), String> {
+    if ver(top) > ver(last) && snap <= last_snap {
+        return Err(format!(
+            "WolOS {top} is newer than the last release {last} but ships on its snapshot {snap} \
+             (the last release's is {last_snap}): the [wolos] tag wolos-{snap} would be the old \
+             release's, and the stable repo of 0.12.x would receive 0.13 packages (ADR 0030, one \
+             date per release). Run tools/bump-snapshot.sh <new date> here and in wolos-iso."
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn moves_with_release_reads_what_it_says() {
+    assert!(moves_with_release("0.13.0", "0.12.1", "2026-11-02", "2026-11-02").is_err());
+    assert!(moves_with_release("0.13.0", "0.12.1", "2026-11-02", "2026-11-01").is_err());
+    assert!(moves_with_release("0.13.0", "0.12.1", "2026-11-02", "2026-11-04").is_ok());
+    // The release commit itself keeps its own snapshot.
+    assert!(moves_with_release("0.12.1", "0.12.1", "2026-11-02", "2026-11-02").is_ok());
+}
+
+/// QA-A9-IMAGE-01: a head whose newest CHANGELOG release is newer than the last published one
+/// ships on a newer archive date than that release did. The facts come from the wolos commit
+/// this repo pins (`_wolos_commit` of wolos-base): its CHANGELOG and tools/release/last-release.txt
+/// (`tag`, `snapshot`). Not checked without a wolos checkout, or while the pin predates the
+/// `snapshot` line (the bump to a newer pin brings it).
+#[test]
+fn snapshot_moves_with_the_release() {
+    let base = read(&here().join("wolos-base/PKGBUILD"));
+    let sha = base
+        .lines()
+        .find_map(|l| l.strip_prefix("_wolos_commit="))
+        .expect("_wolos_commit")
+        .trim()
+        .to_owned();
+    let (Some(log), Some(rec)) = (
+        wolos_show(&sha, "CHANGELOG.md"),
+        wolos_show(&sha, "tools/release/last-release.txt"),
+    ) else {
+        eprintln!("skipped: no wolos checkout (WOLOS_SRC) with {sha}");
+        return;
+    };
+    let field = |k: &str| {
+        rec.lines()
+            .filter(|l| !l.starts_with('#'))
+            .find_map(|l| l.strip_prefix(k)?.strip_prefix(' '))
+            .map(|v| v.trim().to_owned())
+    };
+    let Some(last_snap) = field("snapshot") else {
+        eprintln!("skipped: last-release.txt at {sha} records no snapshot yet");
+        return;
+    };
+    let last = field("tag")
+        .expect("tag")
+        .trim_start_matches('v')
+        .to_owned();
+    let top = log
+        .lines()
+        .find(|l| l.starts_with("## "))
+        .and_then(|h| h[3..].split_whitespace().next())
+        .expect("a CHANGELOG heading")
+        .to_owned();
+    let snap = read(&here().join("snapshot")).trim().to_owned();
+    moves_with_release(&top, &last, &last_snap, &snap).unwrap_or_else(|e| panic!("{e}"));
+}

@@ -7,8 +7,9 @@
 # - linux-wolos-api-headers and scx-wolos have linux-wolos's VERSION;
 # - atlas-browser keeps the paths the browser theme of wolos writes (crates/core/src/browser.rs:
 #   /usr/bin/atlas, /opt/atlas/initial_preferences -> /usr/share/atlas/initial_preferences), provides
-#   web-browser, replaces and conflicts with helium-browser, installs no chromedriver, and pins a
-#   signing key whose public half is in keys/pgp (the artifact is checked by makepkg);
+#   web-browser, replaces and conflicts with helium-browser, installs no chromedriver, takes its
+#   tarball from cdn.wolos.org/atlas/ pinned by sha256 and names no signature source or
+#   validpgpkeys (nothing signs an Atlas artifact: QA-A9-IMAGE-07);
 # - L-07: no shipped flags file or launcher default turns off the sandbox, site isolation or web
 #   security, or opens a debugging port (atlas-browser/, any *flags.conf in the repo);
 # - every PKGBUILD is shellcheck-clean as bash at error level (wolos/docs/STANDARDS.md §4; namcap
@@ -73,6 +74,16 @@ lint_atlas() {
   # chromedriver may only be named to be removed (comments aside).
   if grep -v '^[[:space:]]*#' atlas-browser/PKGBUILD | grep chromedriver | grep -vq 'rm -f'; then
     bad "atlas-browser installs chromedriver (it is out of the package)"
+  fi
+  # The lane publishes the artifact on the CDN and signs nothing: a signature source or a pinned
+  # signing key would be a requirement no step of the pipeline can meet (every faithful build fails).
+  grep -qE '^source=\("https://cdn\.wolos\.org/atlas/\$\{pkgver\}/' atlas-browser/PKGBUILD ||
+    bad "atlas-browser: the tarball source is not https://cdn.wolos.org/atlas/\${pkgver}/ (where the lane publishes)"
+  if grep -v '^[[:space:]]*#' atlas-browser/PKGBUILD | grep -qE '\.(asc|sig)([")[:space:]]|$)'; then
+    bad "atlas-browser: a signature source (.asc/.sig) with no signer: the lane signs nothing, the sha256 pins the artifact"
+  fi
+  if grep -qE '^validpgpkeys=' atlas-browser/PKGBUILD; then
+    bad "atlas-browser: validpgpkeys with no signer behind it (the sha256 pins the artifact)"
   fi
   for fpr in $(cd atlas-browser && startdir=$PWD bash -c 'set +eu; source ./PKGBUILD >/dev/null 2>&1; printf "%s " "${validpgpkeys[@]}"'); do
     [ -f "atlas-browser/keys/pgp/$fpr.asc" ] || bad "atlas-browser: no keys/pgp/$fpr.asc for validpgpkeys"

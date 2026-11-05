@@ -1,10 +1,10 @@
-# WolOS mirrors for [wolos] at release 2026-11-02 ($repo = the repo name; ADR 0030).
+# WolOS mirrors for [wolos] at release 2026-11-04 ($repo = the repo name; ADR 0030).
 # `wol mirror rank` orders them by latency; `wol update` moves the date with each release.
 # A testing image installs a system on its own channel: install-channel rewrites the tag below.
-# Primary: the WolOS CDN (CloudFront in front of the wolos-repo bucket, <tag>/<file>; it falls back
-# to the release assets on its own). Off until the CloudFront domain exists (wolos-build infra:
-# `terraform output repo_domain`): then uncomment it with that domain and bump pkgrel. A server
-# whose name does not resolve costs every sync a DNS failure first.
-#Server = https://REPO_DOMAIN/$repo-2026-11-02
-# The release assets of github.com/wonderlandos/wolos-packages.
-Server = https://github.com/wonderlandos/wolos-packages/releases/download/$repo-2026-11-02
+# Primary: the WolOS CDN, cdn.wolos.org (wolos-cdn; wolos crates/core/src/cdn.rs PRIMARY). One
+# directory per release, named like the release's tag: <repo>-<date>/<file> (wolos-build `publish`
+# writes it; the date is this release's snapshot, so a computer on 0.12.x keeps reading its own
+# date and never receives packages of a later release: ADR 0030, one date per release).
+Server = https://cdn.wolos.org/$repo-2026-11-04
+# The release assets of github.com/wonderlandos/wolos-packages (the same files, the same tag).
+Server = https://github.com/wonderlandos/wolos-packages/releases/download/$repo-2026-11-04
