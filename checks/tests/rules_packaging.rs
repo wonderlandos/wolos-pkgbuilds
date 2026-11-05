@@ -765,6 +765,8 @@ fn rp_036_provides_that_replace_an_arch_package_also_conflict() {
         "web-browser",
         "wayland-compositor",
         "VIRTUALBOX-GUEST-MODULES",
+        // Every dictionary package of the distribution provides it (enchant's hunspell backend).
+        "hunspell-dictionary",
     ];
     let mut v = vec![];
     for (d, t) in recipes() {

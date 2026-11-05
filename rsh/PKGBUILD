@@ -3,7 +3,7 @@
 # interpreter built in. Builds the tagged release of github.com/wonderlandos/rsh; the same text
 # is the `rsh` package of wolos-pkgbuilds.
 pkgname=rsh
-pkgver=0.9.1
+pkgver=0.9.2
 pkgrel=1
 pkgdesc='Ruby with a shell layer: scripts, plain Ruby files and a terminal shell'
 arch=(x86_64)
@@ -17,7 +17,7 @@ _mruby_commit=831da26b9021de0369d17b71b5667e2941a1a32d
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
         "mruby-$_mruby_commit.tar.gz::https://github.com/mruby/mruby/archive/$_mruby_commit.tar.gz")
 noextract=("mruby-$_mruby_commit.tar.gz")
-sha256sums=('9fc0ebe7ea331286219e8128ab5ea2ddc6b899c3cb1c38b9c427b7bab56c8424'
+sha256sums=('6537d668fc6142b737401894c792b44bb5e2094051f2d9a656bfb9d050790cff'
             'e4fb1bbad8276878e84e3c3b6161ac35a4216853de404f8463675aa2d1920b4f')
 
 prepare() {

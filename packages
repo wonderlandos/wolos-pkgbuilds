@@ -22,6 +22,7 @@ webengine-wolos webengine-wolos     -                                       webe
 cryswol        cryswol              libwol                                  cryswol/
 wolkit         wolkit               libwolkit,libwol,cryswol                wolkit/
 wolos-hue      wolos-hue            -                                       wolos-hue/
+wolos-spell-pt wolos-spell-pt       -                                       wolos-spell-pt/
 scx-wolos      scx-wolos            linux-wolos                             scx-wolos/ linux-wolos/VERSION
 rsh            rsh                  -                                       rsh/
 wolos-app-gallery wolos-app-gallery libwolkit,libwol                      wolos-app-gallery/

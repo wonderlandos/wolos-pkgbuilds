@@ -43,7 +43,7 @@ source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_com
 sha256sums=(SKIP SKIP SKIP
             '35472b5aa171de5251b78f19df9940d62c15fe533f5d5873151daf2713a1d6ca'
             '0f3d50026713eefc2a05cb43d5a114de1bd6a858f1cd358a8c476de389e7040f'
-            '500e3b21ef6b3d16352f55afaf52d68c8d5613869de05c53860ef727b37592d8'
+            'a2282f713398cb840236024c880fde87790537e549deedc963880ac86c21753c'
             'e92161b6ce50b2e3540f0118e3ba35b95a0de73a3f7d3049e20eaf1405946704')
 
 prepare() {
