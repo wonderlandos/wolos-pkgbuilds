@@ -88,8 +88,6 @@ relaxed by adding an entry.
   putting the shipped file back is the intent. A new file under `desktop/overlay/etc` that a person or a Settings
   page writes (the firewall rule files and the sudoers drop-in were the two that 0f05dc2 and 870c239 fixed) goes into
   backup=; one that does not needs a row here with the reason.
-- RP-056: wolos-system's `_brand_walls_package` skips an absent staging directory (`[ -d "$e" ] || return 0`);
-  `_brand_walls_build` already fails when the generator is missing (3c1044e), so the directory exists in a good build.
 
 ## Not automated
 

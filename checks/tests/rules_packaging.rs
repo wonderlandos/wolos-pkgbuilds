@@ -44,9 +44,6 @@ const BASELINE: &[(&str, &str)] = &[
     ("RP-055", "etc/xdg/gtk-4.0/settings.ini"),
     ("RP-055", "etc/xdg/qt6ct/qt6ct.conf"),
     ("RP-055", "etc/xdg/xdg-desktop-portal/hyprland-portals.conf"),
-    // RP-056: the staging directory of the themed wallpapers; build() fails loudly when the
-    // generator is missing (3c1044e), the package step still skips an absent staging directory.
-    ("RP-056", "wolos-system: [ -d \"$e\" ] || return 0"),
 ];
 
 fn root() -> PathBuf {
