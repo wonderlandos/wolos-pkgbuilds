@@ -9,7 +9,7 @@
 # running WolKernel and no headers package.
 pkgname=scx-wolos
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=2
+pkgrel=3
 pkgdesc='WolOS QoS scheduler (sched_ext): interactive, foreground, default, utility and background classes'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -23,7 +23,7 @@ _wk=1.0
 _linux=7.3.1
 _tag=wolkernel-$_wk-$_linux
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI).
-_wolos_commit=8697ec4d6151f2b2a81c5f486d5c7a97871b1f94
+_wolos_commit=d7b3176c937edc8ad75a92da45d968bbf29e1863
 source=("linux-$_tag.tar.gz::https://github.com/wonderlandos/linux/archive/refs/tags/$_tag.tar.gz"
   "wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit"
   60-scx-wolos.preset)
