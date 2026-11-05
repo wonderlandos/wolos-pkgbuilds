@@ -27,7 +27,7 @@ source=("https://cdn.wolos.org/atlas/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.
   atlas.sh
   atlas.desktop)
 noextract=("atlas-${pkgver}-x86_64_linux.tar.xz")
-sha256sums=('754b886a210c9110cd28a575329978d751a5bf3635aa45916c0eb15897005951'
+sha256sums=('2f64a6bcc5d9c93b1959e6a768c3d630b114729554e468cc812e1018b51403eb'
             '6b2c204bc4843be76c3813e44a3657567dbd4ea4d33019f39ad5eb91c6534923'
             'ca435d5fa58204aaf71720238133e3d456bf63c827542579c721b637cf0f0251')
 
