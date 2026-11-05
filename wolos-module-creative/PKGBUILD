@@ -8,13 +8,13 @@
 # Not on the ISO and never pre-ticked. Built with makepkg --nodeps (./build.conf): it builds nothing.
 pkgname=wolos-module-creative
 pkgver=0.12.0
-pkgrel=2
+pkgrel=3
 pkgdesc='WolOS Creative module: Blender, GIMP, Krita, Inkscape, OBS, darktable, Kdenlive, Ardour, Audacity'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 depends=(wolos-system blender gimp krita inkscape obs-studio darktable kdenlive ardour audacity
-  colord pipewire-jack gst-plugin-pipewire)
+  colord pipewire-jack gst-plugin-pipewire wolos-hue)
 
 package() {
   # Nothing to install: the dependencies are the module.

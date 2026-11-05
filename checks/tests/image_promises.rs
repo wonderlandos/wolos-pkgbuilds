@@ -74,9 +74,9 @@ fn the_image_ships_what_the_code_runs() {
 #[test]
 fn rsh_builds_the_tagged_release_by_its_checksum() {
     let p = read("rsh/PKGBUILD");
-    assert_eq!(var(&p, "pkgver"), "0.1.3");
+    assert_eq!(var(&p, "pkgver"), "0.9.1");
     assert!(p.contains("$url/archive/refs/tags/v$pkgver.tar.gz"));
-    assert!(p.contains("'6ccb6597707d6d174f0210eb87d7db5b1ab2c97bf75e7f31a0cb5463f1cb1433'"));
+    assert!(p.contains("'9fc0ebe7ea331286219e8128ab5ea2ddc6b899c3cb1c38b9c427b7bab56c8424'"));
     assert!(
         p.contains("check() {") && p.contains(" test\n"),
         "make test runs"

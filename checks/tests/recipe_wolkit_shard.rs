@@ -66,7 +66,9 @@ fn make_install_puts_the_shard_styles_tools_and_template_in_place() {
         "SHARD_DIR := $(DESTDIR)$(PREFIX)/lib/wolos/crystal/wolkit",
         "TEMPLATE_DIR := $(DESTDIR)$(PREFIX)/share/wolos/templates",
         "cp -r src bin styles shard.yml LICENSE README.md $(SHARD_DIR)/",
-        "cp -r ../../templates/app $(TEMPLATE_DIR)/",
+        // QA-PLUG-29: every template `wol app new --template app|cli|tool|ai` copies is installed.
+        "TEMPLATES := app cli tool ai",
+        "for t in $(TEMPLATES); do cp -r ../../templates/$$t $(TEMPLATE_DIR)/; done",
     ] {
         assert!(mk.contains(want), "{SHARD}/Makefile lacks {want}");
     }

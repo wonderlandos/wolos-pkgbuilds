@@ -10,7 +10,7 @@ packaging repos. How packages are built and released: [BUILD.md](BUILD.md).
 | `linux-wolos-api-headers/` | UAPI headers from the same tag |
 | `hyprland-wolos/` | The compositor, 0.56.2, + the WolOS patches (`0*.patch`) |
 | `wolos-system/`, `wopkg/`, `libwol/`, `libwolkit/`, `cryswol/`, `wolkit/`, `wolos-base/`, `wolos-browser-config/` | built from `github.com/wonderlandos/wolos` at `_wolos_commit` (bumped by `tools/bump-wolos.sh`) |
-| `flatpak-wolos/`, `helium-browser/`, `wolos-shim/`, `wolos-keyring/`, `wolos-mirrorlist/` | the rest of the repo |
+| `flatpak-wolos/`, `atlas-browser/`, `wolos-shim/`, `wolos-keyring/`, `wolos-mirrorlist/` | the rest of the repo |
 | `pacman.conf`, `snapshot` | the build chroot: Arch at the WolOS snapshot only |
 | `tools/lint.sh` | recipe rules (own directory only, one wolos pin, versions agree) |
 | `checks/` | contract tests of these recipes (Rust, std only) |

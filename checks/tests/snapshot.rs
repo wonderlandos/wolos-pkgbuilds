@@ -106,6 +106,8 @@ fn bump_snapshot_moves_every_copy() {
         "snapshot",
         "pacman.conf",
         "tools/bump-snapshot.sh",
+        // bump-snapshot.sh also moves wolos-base's `_snapshot=` (the userland pin).
+        "wolos-base/PKGBUILD",
         "wolos-mirrorlist/PKGBUILD",
         "wolos-mirrorlist/wolos-mirrorlist",
         "wolos-mirrorlist/wolos-cachy-mirrorlist",
