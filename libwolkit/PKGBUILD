@@ -6,7 +6,7 @@
 # is the ABI major.
 pkgname=libwolkit
 pkgver=1.1.0  # WOLKIT_VERSION_MAJOR.MINOR.PATCH of crates/wolkit/include/wolkit.h at _wolos_commit
-pkgrel=11
+pkgrel=12
 pkgdesc='WolOS UI engine: libwolkit.so.1 and wolkit.h, the stable C ABI the wolkit shard binds'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -22,7 +22,7 @@ makedepends=(cargo git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules
 # (cargo reads every workspace member, crates/shell included).
-_wolos_commit=b4536f0d4f942fb4039ebb596431d2ab1b452658
+_wolos_commit=6c26d61c1483d1d384a1b24a704da7b3d88584a1
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=63a1de4917acd7869e97a5c75491ec4a43445fdc
 _shell_commit=ab7ac0728bf77c8541fb9568b8a8fec9a2a2c0b6
