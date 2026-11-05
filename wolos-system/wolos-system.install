@@ -9,6 +9,8 @@ post_install() {
   udevadm control --reload >/dev/null 2>&1 || :
   plymouth-set-default-theme wolos >/dev/null 2>&1 || :
   update-mime-database /usr/share/mime >/dev/null 2>&1 || :
+  # 50_wolos.gschema.override: the window-button layout every GTK app starts with (QA-VIS2-51).
+  glib-compile-schemas /usr/share/glib-2.0/schemas >/dev/null 2>&1 || :
   # .local names: nss-mdns (avahi) before systemd-resolved in /etc/nsswitch.conf.
   /usr/lib/wolos/nsswitch-mdns || :
 }
@@ -21,4 +23,5 @@ post_upgrade() {
   systemd-sysusers wolos.conf
   systemd-tmpfiles --create wolos.conf
   /usr/lib/wolos/nsswitch-mdns || :
+  glib-compile-schemas /usr/share/glib-2.0/schemas >/dev/null 2>&1 || :
 }

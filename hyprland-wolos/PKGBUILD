@@ -4,7 +4,7 @@
 # .conf). Packaging follows Arch's hyprland 0.57.1-1. Map: wolos/docs/modules/hyprland-fork.md
 pkgname=hyprland-wolos
 pkgver=0.57.1
-pkgrel=2
+pkgrel=3
 pkgdesc='The WolOS window compositor: a tuned fork with the WolOS patches'
 arch=(x86_64)
 url='https://github.com/hyprwm/Hyprland'
@@ -38,6 +38,7 @@ source=("$_archive.tar.gz::$url/releases/download/v$pkgver/source-v$pkgver.tar.g
   0016-monitor-max_bpc-only-when-built-against-aquamarine-0.patch
   0017-ipc-keyword-and-the-0.56-dispatch-form-on-the-lua-co.patch
   0018-start-hyprland-a-crash-restarts-with-the-config-never-safe.patch
+  0019-xwayland-remember-that-a-client-draws-its-own-frame-.patch
 )
 sha256sums=('24e7428f83115e58e5fc81f100f6b73691dcaaf7a503087391e44327a71c43ab'
             '40647562991a3f7db73c10008f1e716bdbdababf0965a6d22c27c59def32e295'
@@ -56,7 +57,8 @@ sha256sums=('24e7428f83115e58e5fc81f100f6b73691dcaaf7a503087391e44327a71c43ab'
             'a3e828bcb5bd18188356ce30a5480d1b18e20ad7eaedaaa948ee02201b191e65'
             '6302f574c950bc09fd959e21c02f3a603c63b5bae8e6e5f038d0cec11d4d7c1d'
             '9ad4e5c716718a82592fb92cffe8558265218ae57370099bd6e05433613e78c5'
-            '5fd9c713e6ad90a38fe9b76d4a3f18364543377d76e0757bdf6d4bc1df096b5b')
+            '5fd9c713e6ad90a38fe9b76d4a3f18364543377d76e0757bdf6d4bc1df096b5b'
+            'b41931748cf4d1bbb7c870639e4472071f4061db1ff4153ec517a1ce4200fa75')
 
 prepare() {
   ln -sf hyprland-source "$_archive"

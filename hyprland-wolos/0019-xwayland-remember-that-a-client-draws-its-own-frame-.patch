@@ -1,0 +1,138 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kleeedolinux <71413974+kleeedolinux@users.noreply.github.com>
+Date: Thu, 5 Nov 2026 06:00:00 +0000
+Subject: [PATCH] xwayland: remember that a client draws its own frame
+ (_GTK_FRAME_EXTENTS)
+
+Xwayland GTK apps (gnome-text-editor under GDK_BACKEND=x11, the portal file
+chooser) draw a header bar with its own window buttons and a shadow. The
+compositor could not tell them from a plain X11 window, so wol-hypr put its
+title strip over them: two sets of buttons, the title twice (QA-WM-2).
+
+GTK sets _GTK_FRAME_EXTENTS (four CARDINALs) on every toplevel it draws a frame
+for. The XWM reads it with the other window properties, at map and on every
+change, into CXWaylandSurface::m_gtkFrameExtents for the plugin to ask.
+---
+ src/helpers/WolosXFrame.hpp   | 17 +++++++++++++++++
+ src/xwayland/XSurface.hpp     |  1 +
+ src/xwayland/XWM.cpp          | 11 +++++++++--
+ src/xwayland/XWayland.hpp     |  1 +
+ tests/helpers/WolosXFrame.cpp | 13 +++++++++++++
+ 5 files changed, 41 insertions(+), 2 deletions(-)
+ create mode 100644 src/helpers/WolosXFrame.hpp
+ create mode 100644 tests/helpers/WolosXFrame.cpp
+
+diff --git a/src/helpers/WolosXFrame.hpp b/src/helpers/WolosXFrame.hpp
+new file mode 100644
+index 0000000..d2ef0ab
+--- /dev/null
++++ b/src/helpers/WolosXFrame.hpp
+@@ -0,0 +1,17 @@
++#pragma once
++
++// WolOS: which Xwayland clients draw their own window frame. Pure: tested in tests/helpers/WolosXFrame.cpp.
++
++#include <cstdint>
++
++namespace WolosXFrame {
++    // _GTK_FRAME_EXTENTS is four CARDINALs (left, right, top, bottom of the client-side shadow). GTK sets it on
++    // every toplevel it draws a frame for (header bar, buttons, shadow), zeros included when the window is
++    // maximised or tiled, and deletes it when the window stops drawing one. The property being there with that
++    // shape is the whole answer; its values are not.
++    inline constexpr uint32_t EXTENTS_LEN = 4;
++
++    inline constexpr bool drawsOwnFrame(bool typeIsCardinal, uint32_t valueLen) {
++        return typeIsCardinal && valueLen == EXTENTS_LEN;
++    }
++}
+diff --git a/src/xwayland/XSurface.hpp b/src/xwayland/XSurface.hpp
+index ee38a3c..5ff3f80 100644
+--- a/src/xwayland/XSurface.hpp
++++ b/src/xwayland/XSurface.hpp
+@@ -85,6 +85,7 @@ class CXWaylandSurface {
+     bool                              m_minimized        = false;
+     bool                              m_mapped           = false;
+     bool                              m_modal            = false;
++    bool                              m_gtkFrameExtents  = false; // WolOS: the client draws its own frame (_GTK_FRAME_EXTENTS)
+ 
+     WP<CXWaylandSurface>              m_parent;
+     WP<CXWaylandSurface>              m_self;
+diff --git a/src/xwayland/XWM.cpp b/src/xwayland/XWM.cpp
+index 9f081e5..71ca9b8 100644
+--- a/src/xwayland/XWM.cpp
++++ b/src/xwayland/XWM.cpp
+@@ -13,6 +13,7 @@
+ #include <xcb/xcb_icccm.h>
+ 
+ #include "XWayland.hpp"
++#include "../helpers/WolosXFrame.hpp"
+ #include "../Compositor.hpp"
+ #include "../protocols/core/Seat.hpp"
+ #include "../managers/eventLoop/EventLoopManager.hpp"
+@@ -344,6 +345,10 @@ void CXWM::readProp(SP<CXWaylandSurface> XSURF, uint32_t atom, xcb_get_property_
+         XSURF->m_protocols.assign(atoms, atoms + reply->value_len);
+     };
+ 
++    // WolOS: GTK sets this on every window it draws a frame and shadow for; wol-hypr keeps such a
++    // window's own buttons instead of adding a title strip (QA-WM-2).
++    auto handleGtkFrameExtents = [&]() { XSURF->m_gtkFrameExtents = WolosXFrame::drawsOwnFrame(reply->type == XCB_ATOM_CARDINAL, reply->value_len); };
++
+     if (atom == XCB_ATOM_WM_CLASS)
+         handleWMClass();
+     else if (atom == XCB_ATOM_WM_NAME || atom == HYPRATOMS["_NET_WM_NAME"])
+@@ -362,6 +367,8 @@ void CXWM::readProp(SP<CXWaylandSurface> XSURF, uint32_t atom, xcb_get_property_
+         handleSizeHints();
+     else if (atom == HYPRATOMS["WM_PROTOCOLS"])
+         handleWMProtocols();
++    else if (atom == HYPRATOMS["_GTK_FRAME_EXTENTS"])
++        handleGtkFrameExtents();
+     else {
+         LOG(Log::TRACE, "[xwm] Unhandled prop {} -> {}", atom, propName);
+         return;
+@@ -1190,10 +1197,10 @@ void CXWM::onNewResource(SP<CXWaylandSurfaceResource> resource) {
+ }
+ 
+ void CXWM::readWindowData(SP<CXWaylandSurface> surf) {
+-    const std::array<xcb_atom_t, 9> interestingProps = {
++    const std::array<xcb_atom_t, 10> interestingProps = {
+         XCB_ATOM_WM_CLASS,          XCB_ATOM_WM_NAME,          XCB_ATOM_WM_TRANSIENT_FOR,        HYPRATOMS["WM_HINTS"],
+         HYPRATOMS["_NET_WM_STATE"], HYPRATOMS["_NET_WM_NAME"], HYPRATOMS["_NET_WM_WINDOW_TYPE"], HYPRATOMS["WM_NORMAL_HINTS"],
+-        HYPRATOMS["WM_PROTOCOLS"],
++        HYPRATOMS["WM_PROTOCOLS"],  HYPRATOMS["_GTK_FRAME_EXTENTS"],
+     };
+ 
+     for (size_t i = 0; i < interestingProps.size(); i++) {
+diff --git a/src/xwayland/XWayland.hpp b/src/xwayland/XWayland.hpp
+index 7fd6e35..9df535b 100644
+--- a/src/xwayland/XWayland.hpp
++++ b/src/xwayland/XWayland.hpp
+@@ -93,6 +93,7 @@ inline std::unordered_map<std::string, uint32_t> HYPRATOMS = {
+     HYPRATOM("_NET_REQUEST_FRAME_EXTENTS"),
+     HYPRATOM("_NET_FRAME_EXTENTS"),
+     HYPRATOM("_MOTIF_WM_HINTS"),
++    HYPRATOM("_GTK_FRAME_EXTENTS"),
+     HYPRATOM("WM_CHANGE_STATE"),
+     HYPRATOM("_NET_SYSTEM_TRAY_OPCODE"),
+     HYPRATOM("_NET_SYSTEM_TRAY_COLORS"),
+diff --git a/tests/helpers/WolosXFrame.cpp b/tests/helpers/WolosXFrame.cpp
+new file mode 100644
+index 0000000..4018713
+--- /dev/null
++++ b/tests/helpers/WolosXFrame.cpp
+@@ -0,0 +1,13 @@
++#include <helpers/WolosXFrame.hpp>
++
++#include <gtest/gtest.h>
++
++using namespace WolosXFrame;
++
++TEST(WolosXFrame, aGtkFrameIsFourCardinals) {
++    EXPECT_TRUE(drawsOwnFrame(true, 4));   // gnome-text-editor under GDK_BACKEND=x11, the portal file chooser
++    EXPECT_FALSE(drawsOwnFrame(false, 4)); // some other type under the same name
++    EXPECT_FALSE(drawsOwnFrame(true, 0));  // deleted: the window stopped drawing its own frame
++    EXPECT_FALSE(drawsOwnFrame(true, 3));
++    EXPECT_FALSE(drawsOwnFrame(false, 0)); // no such property (reply type none)
++}
+-- 
+2.43.0
+

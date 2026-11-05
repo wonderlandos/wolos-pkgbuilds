@@ -154,3 +154,49 @@ fn start_hyprland_restarts_with_the_config_not_safe_mode() {
         assert!(md.contains(t), "{t} is named in SERIES.md");
     }
 }
+
+/// QA-WM-1: minimise, Hide and the title-strip button all move the focused window to
+/// `special:hidden` with a silent move. Hyprland 0.56.2 then refocused only a window under the old
+/// window's centre or the pointer; with none there the keyboard stayed on the hidden window
+/// (`hyprctl activewindow` = special:hidden). 0.57.0 fixed it upstream in `Actions::moveToWorkspace`:
+/// with nothing at that point it focuses the old desktop's first window (or nothing). The fix is
+/// the base, so the base must not go back below 0.57.1 (the version SERIES.md names).
+#[test]
+fn the_base_refocuses_after_a_silent_move() {
+    let pkgbuild =
+        std::fs::read_to_string(dir().join("PKGBUILD")).expect("hyprland-wolos/PKGBUILD");
+    let pkgver = pkgbuild
+        .lines()
+        .find_map(|l| l.strip_prefix("pkgver="))
+        .expect("pkgver=");
+    let v: Vec<u32> = pkgver.split('.').map(|n| n.parse().unwrap()).collect();
+    assert!(
+        v >= vec![0, 57, 1],
+        "pkgver {pkgver}: below 0.57.1 a minimised window keeps the keyboard (QA-WM-1)"
+    );
+}
+
+/// QA-WM-2: patch 0019 teaches the XWM that a client draws its own frame (`_GTK_FRAME_EXTENTS`),
+/// which wol-hypr asks for (`m_gtkFrameExtents`) to keep the app's own window buttons.
+#[test]
+fn the_xwm_reads_gtk_frame_extents() {
+    let patch = patches()
+        .into_iter()
+        .find(|n| n.starts_with("0019-xwayland-"))
+        .expect("patch 0019 (_GTK_FRAME_EXTENTS)");
+    let text = std::fs::read_to_string(dir().join(&patch)).unwrap();
+    for needle in [
+        r#"HYPRATOM("_GTK_FRAME_EXTENTS")"#,
+        "m_gtkFrameExtents",
+        "WolosXFrame::drawsOwnFrame(reply->type == XCB_ATOM_CARDINAL, reply->value_len)",
+        // Read when the window maps, and again on every change.
+        r#"HYPRATOMS["_GTK_FRAME_EXTENTS"],"#,
+        "std::array<xcb_atom_t, 10> interestingProps",
+        "tests/helpers/WolosXFrame.cpp",
+    ] {
+        assert!(text.contains(needle), "0019 lacks {needle}");
+    }
+    let md = std::fs::read_to_string(dir().join("SERIES.md")).unwrap();
+    assert!(md.contains("WolosXFrame.aGtkFrameIsFourCardinals"));
+    assert!(text.contains("TEST(WolosXFrame, aGtkFrameIsFourCardinals)"));
+}
