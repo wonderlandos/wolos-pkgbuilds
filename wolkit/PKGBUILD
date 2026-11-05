@@ -6,7 +6,7 @@
 # (/usr/share/wolos/templates/app). The shard's own `make install` decides the layout.
 pkgname=wolkit
 pkgver=0.1.0  # version: of wolos-crystal/shards/wolkit/shard.yml at _wolos_commit
-pkgrel=12
+pkgrel=13
 pkgdesc='WolOS UI kit for Crystal: the wolkit shard, its default look and the app template'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
@@ -18,7 +18,7 @@ makedepends=(git)
 options=(!debug)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). The shard is plain Crystal
 # source: no submodule is needed to install or check it.
-_wolos_commit=4258a7eec9996e91ec1488854210a9feff0ecc1c
+_wolos_commit=4bc963670187d52cb1fe7a4595757e44dc2ffff6
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 
