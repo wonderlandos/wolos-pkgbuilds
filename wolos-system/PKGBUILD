@@ -75,7 +75,10 @@ _brand_walls_build() {
 # _brand_walls_build made, into usr/share/wolos/wallpapers. $1: the wolos tree; $2: staging; $3: pkgdir.
 _brand_walls_package() {
   local w=$1/design/brand/wallpapers e=$2 p
-  [ -d "$e" ] || return 0
+  if [ ! -f "$e/wolos-gate.params.json" ] || ! ls "$e"/themes/gate-*.svg >/dev/null 2>&1; then
+    echo "error: $e has no generated gate wallpapers: _brand_walls_build did not run, and the package would ship none" >&2
+    return 1
+  fi
   local wp=$3/usr/share/wolos/wallpapers
   install -d "$wp/themes"
   install -m644 -t "$wp" "$w"/wolos-gate-{day,night}-{4k,16x10}.svg "$e/wolos-gate.params.json"
