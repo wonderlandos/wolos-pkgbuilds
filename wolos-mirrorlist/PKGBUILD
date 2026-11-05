@@ -2,10 +2,11 @@
 # wolos-mirrorlist: where pacman finds [wolos] (wolos-mirrorlist, dated: the release's snapshot,
 # wolos-iso/profile/snapshot; `wol update` moves it, `wol mirror rank` reorders it) and the gated
 # CachyOS x86-64-v3 repos (wolos-cachy-mirrorlist: the CDN's /cachy/ redirect, no date). ADR 0030.
-# REPO_DOMAIN in both files is the CloudFront domain: commented out until terraform apply, then
-# set once (pkgrel bump).
+# wolos-mirrorlist names the CDN first (https://cdn.wolos.org/$repo-DATE, wolos crates/core/src/cdn.rs
+# PRIMARY) and GitHub second; wolos-cachy-mirrorlist keeps its REPO_DOMAIN placeholder, commented
+# out, until the CachyOS redirect has a domain (pkgrel bump then).
 pkgname=wolos-mirrorlist
-pkgver=2026.11.02
+pkgver=2026.11.04
 pkgrel=1
 pkgdesc='WolOS package mirror list'
 arch=(any)
@@ -13,7 +14,7 @@ url='https://github.com/wonderlandos/wolos'
 license=(GPL-2.0-or-later)
 backup=(etc/pacman.d/wolos-mirrorlist etc/pacman.d/wolos-cachy-mirrorlist)
 source=(wolos-mirrorlist wolos-cachy-mirrorlist)
-sha256sums=('aa6891a0d8c55f326457ab8b7c85db72b3c5c15c8a21c1a0a4beb132c28d57aa'
+sha256sums=('43592d2e1878143f8caac6fd7c27c73fb69a29efd9c39b2fcce0e8f6df8040e5'
             'ceadfb285fbec7b34c1d0bd9627aa9c7d6a06141876aa11a4e2219a5d2e066fc')
 
 package() {

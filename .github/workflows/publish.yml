@@ -13,10 +13,10 @@
 #     (s3://wolos-repo/<tag>/; the run stops before any write when that bucket is missing). Without it
 #     (hand mode, WOLOS_GH_RECORD) every release write is recorded in s3://$BUCKET/runs/<run>/gh-release.sh
 #     and a ::notice:: gives main the upload command and the what=cdn dispatch to run after it.
-#     No WOLOS_GPG_KEY is always an error.
+#     No WOLOS_GPG_KEY in this mode is always an error (the sign step stops).
 #   mode=cdn: `wolos-build publish --cdn-only <run>`: s3://$BUCKET/runs/<run>/signed/ to the CDN's
 #     bucket after main uploaded it, every file checked on the release first.
-# Secrets: WOLOS_GPG_KEY, WOLOS_RELEASES_TOKEN (optional). Variables: AWS_ROLE_ARN, AWS_REGION, BUCKET,
+# Secrets: WOLOS_GPG_KEY (mode=sign only), WOLOS_RELEASES_TOKEN (optional). Variables: AWS_ROLE_ARN, AWS_REGION, BUCKET,
 # WOLOS_CDN_DIST, WOLOS_REPO_BUCKET, WOLOS_RELEASES_REPO. The tool: the builder image (.github/builder).
 name: publish
 
@@ -32,8 +32,10 @@ on:
         type: string
         default: sign
     secrets:
+      # Only mode=sign signs. A caller of mode=cdn passes no key (RC-072 in wolos-build, least
+      # privilege); the sign step stops when the key is empty (QA-A9-IMAGE-11).
       WOLOS_GPG_KEY:
-        required: true
+        required: false
       WOLOS_RELEASES_TOKEN:
         required: false
 

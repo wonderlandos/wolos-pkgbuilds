@@ -1300,6 +1300,119 @@ fn rp_057_reader_reads_what_it_says() {
     }
 }
 
+/// The recipes whose pkgver follows the wolos CHANGELOG (tools/bump-wolos.sh `*)` arm): every
+/// recipe built from `_wolos_commit` except the ones that follow their own ABI or shard version.
+const OWN_VERSION: &[&str] = &[
+    "wopkg",
+    "libwol",
+    "libwolkit",
+    "wolkit",
+    "cryswol",
+    "wolos-browser-config",
+];
+
+/// The first `## ` heading of a CHANGELOG: Ok(its version) when it is `## N.N.N ...`, Err(why not)
+/// when the newest section is not a numbered release (`## Unreleased` above the last release
+/// made the 0.13 head ship as 0.12.1, QA-A9-IMAGE-01).
+fn changelog_top(text: &str) -> Result<String, String> {
+    let h = text
+        .lines()
+        .find(|l| l.starts_with("## "))
+        .ok_or("no `## ` heading")?;
+    let v = h[3..].split_whitespace().next().unwrap_or("");
+    let numeric = !v.is_empty()
+        && v.split('.')
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+    if numeric && v.contains('.') {
+        Ok(v.to_owned())
+    } else {
+        Err(format!(
+            "the newest CHANGELOG heading is `{h}`, not a numbered release"
+        ))
+    }
+}
+
+/// `1.2.3` as numbers, for ordering.
+fn ver_key(v: &str) -> Vec<u64> {
+    v.split('.').filter_map(|p| p.parse().ok()).collect()
+}
+
+#[test]
+fn rp_058_pkgver_is_the_newest_changelog_release_at_the_pin() {
+    use std::process::Command;
+    let wolos = wolos_checkout();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&wolos)
+            .args(args)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+    };
+    let (mut found, mut checked) = (vec![], 0);
+    for (d, t) in recipes() {
+        let Some(sha) = scalar(&t, "_wolos_commit") else {
+            continue;
+        };
+        if OWN_VERSION.contains(&d.as_str()) {
+            continue;
+        }
+        let Some(log) = git(&["show", &format!("{sha}:CHANGELOG.md")]) else {
+            continue; // no checkout, or the pin is not in it (RP-057 says so)
+        };
+        checked += 1;
+        let pkgver = scalar(&t, "pkgver").unwrap_or_default();
+        match changelog_top(&log) {
+            Err(e) => found.push(format!("{d}: {e} at {sha}")),
+            Ok(top) if top != pkgver => found.push(format!(
+                "{d}: pkgver={pkgver}, the newest CHANGELOG release at {sha} is {top}"
+            )),
+            Ok(top) => {
+                // A head that is not a release commit must be newer than the newest release tag
+                // it descends from: the same version twice is one release called by two names.
+                let tags = git(&["tag", "--merged", &sha, "--list", "v[0-9]*"]).unwrap_or_default();
+                let newest = tags.lines().max_by_key(|t| ver_key(&t[1..]));
+                if let Some(tag) = newest {
+                    let at_tag = git(&["rev-parse", &format!("{tag}^{{commit}}")])
+                        .is_some_and(|c| c.trim() == sha);
+                    if !at_tag && ver_key(&top) <= ver_key(&tag[1..]) {
+                        found.push(format!(
+                            "{d}: {top} at {sha} is not newer than {tag}, the release it descends from"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    if checked == 0 && found.is_empty() {
+        eprintln!(
+            "RP-058: no wolos git checkout at {}: not checked",
+            wolos.display()
+        );
+        return;
+    }
+    verdict("RP-058", found);
+}
+
+#[test]
+fn rp_058_reader_reads_what_it_says() {
+    assert_eq!(
+        changelog_top("# Changelog\n\n## 0.13.0 (2026-11-05)\n- x\n## 0.12.1\n"),
+        Ok("0.13.0".into())
+    );
+    assert_eq!(changelog_top("## 0.13.0\n"), Ok("0.13.0".into()));
+    // The newest section named `Unreleased` above a release: the bug the rule exists for.
+    assert!(changelog_top("# Changelog\n\n## Unreleased\n\n## 0.12.1 (unreleased)\n").is_err());
+    assert!(
+        changelog_top("## 13\n").is_err(),
+        "a bare number is no release"
+    );
+    assert!(changelog_top("nothing\n").is_err());
+    assert!(ver_key("0.13.0") > ver_key("0.12.1") && ver_key("0.12.10") > ver_key("0.12.9"));
+}
+
 /// Rule ids of docs/RULES-packaging.md (`| RP-nnn |` rows) and of the `fn rp_nnn_` tests here.
 #[test]
 fn rp_catalogue_matches_docs() {

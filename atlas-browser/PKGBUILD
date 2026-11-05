@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # atlas-browser: Atlas, the WolOS browser. A repack of OUR release artifact: the tarball the
-# browser lane (wolos-build atlas/lane.sh package) builds from the engine and our overlay and signs
-# with the WolOS release key. Nothing is compiled here (the compile is the lane's, ADR 0043 D7), so
-# this recipe builds in the clean chroot in seconds. makepkg checks the detached signature against
-# the key pinned in validpgpkeys (the key is in keys/pgp).
+# browser lane (wolos-build atlas/lane.sh package) builds from the engine and our overlay, and
+# publishes on the WolOS CDN (https://cdn.wolos.org/atlas/<pkgver>/, lane.sh publish). Nothing is
+# compiled here (the compile is the lane's, ADR 0043 D7), so this recipe builds in the clean chroot
+# in seconds. The sha256 below pins the artifact byte for byte (as wolos-shim's does); there is no
+# detached signature: nothing in the pipeline signs an Atlas artifact, so a signature source would
+# only make every faithful build fail at the prefetch (QA-A9-IMAGE-07). When the lane publishes a
+# new artifact: tools in wolos-build atlas/repack-inputs.sh print the new pkgver and sha256.
 # Installs to /opt/atlas, the launcher /usr/bin/atlas (atlas.sh), the desktop file and the icon.
 # WolOS settings (policies, first-run preferences) come from wolos-system.
 # Split in two packages: the main one keeps the 13 locale packs of the 12 WolOS languages
@@ -20,16 +23,13 @@ url='https://github.com/wonderlandos/atlas'
 # files and the engine; the rest is the engine's bundled third-party set (its credits list).
 license=(GPL-3.0-or-later BSD-3-Clause LGPL-2.1-or-later MPL-2.0 Apache-2.0 MIT)
 options=(!strip !debug)
-source=("$url/releases/download/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz"
-  "$url/releases/download/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz.asc"
+source=("https://cdn.wolos.org/atlas/${pkgver}/atlas-${pkgver}-x86_64_linux.tar.xz"
   atlas.sh
   atlas.desktop)
 noextract=("atlas-${pkgver}-x86_64_linux.tar.xz")
 sha256sums=('754b886a210c9110cd28a575329978d751a5bf3635aa45916c0eb15897005951'
-            SKIP
             '6b2c204bc4843be76c3813e44a3657567dbd4ea4d33019f39ad5eb91c6534923'
             'ca435d5fa58204aaf71720238133e3d456bf63c827542579c721b637cf0f0251')
-validpgpkeys=('C3B6062A2BA6EEABC1DA0F5766C5F2B181374033') # WolOS Repository Signing <onmikron@gmail.com>
 
 # The 13 packs of the main package: the 12 languages of wolos core::region::LANGUAGES (English
 # twice, UK and US; Spanish twice, Spain and Latin America, which Chromium names separately).
