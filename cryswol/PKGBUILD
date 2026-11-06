@@ -6,7 +6,7 @@
 # shard's own `make install` decides the layout.
 pkgname=cryswol
 pkgver=0.1.0  # version: of wolos-crystal/shards/cryswol/shard.yml at _wolos_commit
-pkgrel=15
+pkgrel=16
 pkgdesc='WolOS app framework for Crystal: the cryswol shard over libwol'
 arch=(any)
 url='https://github.com/wonderlandos/wolos'
@@ -20,7 +20,7 @@ makedepends=(git)
 options=(!debug)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). The shard is plain Crystal
 # source: no submodule is needed to install or check it.
-_wolos_commit=6c26d61c1483d1d384a1b24a704da7b3d88584a1
+_wolos_commit=1b8e8c3b85c6ac7a9e734a0b8b2687a660cefa6b
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 
