@@ -1,6 +1,12 @@
 # WolOS (wolos-pkgbuilds/wolos-system): Arch units the image ships for code that reads them.
 # Energy Mode, Low/High Power Mode, `wol power apply` (wol_core::power::policy: powerprofilesctl).
 enable power-profiles-daemon.service
+# Intel's cooling helper (thermald, DPTF): on at boot like the power daemon; the unit skips VMs
+# (ConditionVirtualization=no) and ends cleanly on a CPU it does not know (SuccessExitStatus=2), so
+# it is safe on AMD. `wol doctor hardware` (cooling) reads it.
+enable thermald.service
+# Fingerprint readers (fprintd) and Thunderbolt (bolt) are D-Bus activated: no preset, nothing
+# runs until a reader or a dock is there.
 # Firmware updates (fwupd, D-Bus activated): the metadata download stays off until the person turns
 # it on; it fetches third-party data (as wolos-clam-update.timer).
 disable fwupd-refresh.timer

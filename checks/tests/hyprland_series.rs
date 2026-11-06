@@ -101,7 +101,11 @@ fn pkgbuild_has_one_checksum_per_source_and_one_name_per_line() {
         std::fs::read_to_string(dir().join("PKGBUILD")).expect("hyprland-wolos/PKGBUILD");
     let sources = array_items(&pkgbuild, "source");
     let sums = array_items(&pkgbuild, "sha256sums");
-    assert_eq!(sources.len(), sums.len(), "source= and sha256sums= differ in length");
+    assert_eq!(
+        sources.len(),
+        sums.len(),
+        "source= and sha256sums= differ in length"
+    );
     for s in &sums {
         assert!(
             s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()),
@@ -142,7 +146,10 @@ fn start_hyprland_restarts_with_the_config_not_safe_mode() {
     assert!(text.contains("safeMode = WolosRestart::safeModeAfterCrash();"));
     assert!(text.contains("WolosRestart::afterCrash(lastCrash, NOW)"));
     assert!(text.contains("return 1;"), "a second crash exits with 1");
-    assert!(text.contains("REPEAT_WINDOW{30}"), "the repeat window is 30 s");
+    assert!(
+        text.contains("REPEAT_WINDOW{30}"),
+        "the repeat window is 30 s"
+    );
     // Its tests are in the patch and named in SERIES.md.
     assert!(text.contains("tests/helpers/WolosRestart.cpp"));
     let md = std::fs::read_to_string(dir().join("SERIES.md")).unwrap();
@@ -150,7 +157,10 @@ fn start_hyprland_restarts_with_the_config_not_safe_mode() {
         "WolosRestart.aFirstCrashRestartsWithTheWolosConfig",
         "WolosRestart.aSecondCrashWithinThirtySecondsGivesUp",
     ] {
-        assert!(text.contains(&t["WolosRestart.".len()..]), "{t} is in the patch");
+        assert!(
+            text.contains(&t["WolosRestart.".len()..]),
+            "{t} is in the patch"
+        );
         assert!(md.contains(t), "{t} is named in SERIES.md");
     }
 }
