@@ -4,7 +4,7 @@
 # files/ (systemd units, installer, helpers) and design (icons, wallpapers, illustrations).
 pkgname=wolos-system
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=11
+pkgrel=12
 pkgdesc='WolOS system services, shell and desktop defaults'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -29,7 +29,7 @@ backup=(etc/sudoers etc/wolos/shell.json etc/sudoers.d/wolos etc/pam.d/wol-login
   etc/profile.d/wolos-console.sh etc/profile.d/wolos-ime.sh)
 install=wolos-system.install
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI), with its submodules.
-_wolos_commit=0cfabd429a6c9fd4ce2053ab707f9c33d2eadbdd
+_wolos_commit=eb0c9ab5046fdcbf4ac8fc9470dd0d27b4e81c05
 # The submodule commits recorded in wolos at _wolos_commit (bump-wolos.sh keeps them in step).
 _brand_commit=63a1de4917acd7869e97a5c75491ec4a43445fdc
 _shell_commit=bb8affaf73b1e4a8e77c67d0797c0b49a72b8cda

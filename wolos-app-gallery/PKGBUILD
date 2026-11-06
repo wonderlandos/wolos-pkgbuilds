@@ -6,7 +6,7 @@
 # system.
 pkgname=wolos-app-gallery
 pkgver=0.13.0  # the newest CHANGELOG.md entry at _wolos_commit
-pkgrel=10
+pkgrel=11
 pkgdesc='WolOS picture library and viewer: smart sections by date and place, zoom, slideshow'
 arch=(x86_64)
 url='https://github.com/wonderlandos/wolos'
@@ -19,7 +19,7 @@ makedepends=('crystal>=1.22.0' git)
 options=(!debug !lto)
 # The WolOS source at one commit (bumped by bump-wolos.sh from wolos CI). No submodule is needed: the
 # app and both shards are plain Crystal source in the main tree.
-_wolos_commit=0cfabd429a6c9fd4ce2053ab707f9c33d2eadbdd
+_wolos_commit=eb0c9ab5046fdcbf4ac8fc9470dd0d27b4e81c05
 source=("wolos::git+https://github.com/wonderlandos/wolos.git#commit=$_wolos_commit")
 sha256sums=(SKIP)
 
